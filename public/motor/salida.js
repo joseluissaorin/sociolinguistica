@@ -40,6 +40,12 @@ Whisper/           Transcripción automática con tiempos de cada audio (.txt le
 casos.json         Los mismos casos con todos sus datos internos (lo usa la categorización con Jev).
 resumen.csv        Casos por hablante.
 
+Valores de -d-: ${(info.valores || []).map((x) => x.v).join(", ") || "plena, relajada, elidida, no analizable"}
+                   (por defecto, los de la Guía PRESEEA de estudio de la /d/ intervocálica, 2021;
+                   «no analizable» no es una variante y no cuenta en los porcentajes).
+Columna «Guía PRESEEA»: «cuenta» o el motivo por el que la guía excluye el caso
+                   (d entre palabras, palabra cortada, semivocal o semiconsonante: raudo, medio, estudio).
+
 Opciones: d entre palabras ${info.opciones.frontera ? "sí" : "no"} · pasajes en otras lenguas ${info.opciones.otrasLenguas ? "sí" : "no"} · palabras extranjeras ${info.opciones.extranjero ? "sí" : "no"} · Jev ${info.jev ? "sí" : "no"}
 Solo se incluyen los casos que caen dentro del audio: los MP3 abiertos del corpus duran unos diez minutos.
 
@@ -82,6 +88,7 @@ export function reempaquetar(json, { plantillaEstudio, csvAnterior = "" }) {
       if (f.Revisor) c.revisor = f.Revisor;
       if (f.Notas) c.notas = f.Notas;
       if (f.Enlace) c.enlace = f.Enlace;
+      if (f["Asignado a"]) c.asignado = f["Asignado a"];
     }
   }
   const casos = json.casos.filter((c) => !c.descartado);

@@ -97,6 +97,7 @@
       <fieldset class="opciones">
         <legend>Qué hacer después</legend>
         <label><input type="checkbox" id="oJev" checked> Categorizar con Jev (categoría gramatical, lema según el contexto y elisiones dudosas)</label>
+        <label>Valores para decidir cada caso: <select id="oEsquema"></select> <small>· se pueden cambiar luego en el estudio</small></label>
         <label>Margen del recorte a cada lado de la palabra: <select id="oMargen"><option>1</option><option selected>1.5</option><option>2</option><option>3</option></select> s</label>
       </fieldset>
       <div class="acciones">
@@ -147,11 +148,14 @@ import { procesarEntrevista } from "./motor/proceso.js";
 import { empaquetar, reempaquetar } from "./motor/salida.js";
 import { categorizar } from "./motor/jev.js";
 import { leerCSV } from "./motor/csv.js";
+import { ESQUEMAS, valoresDe } from "./motor/valores.js";
 
 const $ = (id) => document.getElementById(id);
 const CLAVE_OK = /^[A-Za-z0-9_\-]{3,40}$/;
 const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
 let entrevistas = [], abortador = null;
+
+for (const [k, e] of Object.entries(ESQUEMAS)) $("oEsquema").append(new Option(e.nombre + (k === "guia" ? " (recomendado)" : ""), k));
 
 // ---------- pestañas ----------
 for (const b of document.querySelectorAll("nav button")) b.onclick = () => {
@@ -297,7 +301,7 @@ $("procesar").onclick = async () => {
     }
     if (!hechas.length) throw new Error("No se pudo procesar ninguna entrevista.");
     const ciudades = [...new Set(hechas.map((h) => h.meta.ciudad).filter(Boolean))];
-    const info = { generado: new Date().toLocaleString("es-ES"), herramienta: "sociolinguistica.joseluissaorin.com", opciones, margen, jev };
+    const info = { generado: new Date().toLocaleString("es-ES"), herramienta: "sociolinguistica.joseluissaorin.com", opciones, margen, jev, esquema: $("oEsquema").value, valores: valoresDe($("oEsquema").value) };
     $("estado").textContent = "Montando el ZIP…";
     await guardarZip(empaquetar(hechas, { plantillaEstudio: plantilla, info }), nombreZip(hechas, ciudades));
     const validos = todos.filter((c) => !c.descartado).length;

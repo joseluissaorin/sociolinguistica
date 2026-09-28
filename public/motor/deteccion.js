@@ -145,6 +145,23 @@ export function lemasPorRegla(w, lex) {
   return null;
 }
 
+// Criterios de exclusión de la Guía PRESEEA de la /d/ intervocálica (2021): solo cuenta la d en
+// interior de palabra, y se excluyen las palabras cortadas y los contextos con semivocal
+// (raudo) o semiconsonante (medio, estudio, pidiera), donde la conservación es casi categórica.
+export function segunGuia(c, tok) {
+  if (c.posicion === "entre palabras") return "excluido: entre palabras";
+  if (tok && tok.avisos.has("palabra cortada")) return "excluido: palabra cortada";
+  const w = (c.estandar || "").toLowerCase(), p = c.posD;
+  if (p > 0) {
+    const antes = w[p - 1], antes2 = w[p - 2], despues = w[p + 1], despues2 = w[p + 2];
+    // Solo junto a vocal fuerte: en «cuidado» o «ruido» la i es el núcleo, no semivocal.
+    const fuerte = (x) => !!x && "aeoáéó".includes(x);
+    if ((antes === "i" || antes === "u") && fuerte(antes2)) return "excluido: semivocal";
+    if ((despues === "i" || despues === "u") && fuerte(despues2)) return "excluido: semiconsonante";
+  }
+  return "cuenta";
+}
+
 // Devuelve los casos de una entrevista ya leída con leerTranscripcion().
 // incluir(tok) permite filtrar (por ejemplo, solo las palabras que caen dentro del audio).
 export function detectar(tr, lexicos, opciones = {}, incluir = () => true) {
@@ -231,6 +248,7 @@ export function detectar(tr, lexicos, opciones = {}, incluir = () => true) {
         c.avisos.push(regla ? "lema por regla" : "no está en el léxico");
       }
       c.categoria = c.categoria || categoriaProvisional(std, c.previa);
+      c.guia = segunGuia(c, tok);
       c.lema = lex ? elegirLema(c.candidatos, c.categoria, std, lenguaLex) : std;
       casos.push(c);
     }

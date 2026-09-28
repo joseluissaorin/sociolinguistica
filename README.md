@@ -45,7 +45,23 @@ Las nueve primeras columnas de `casos.csv` son las de la base de datos del traba
 | Recorte, Enlace | El audio del caso en el ZIP y, si se sube, en Drive. |
 | Revisor, Notas | Para el grupo. |
 
+| Guía PRESEEA | `cuenta`, o por qué la guía oficial excluye el caso: d entre palabras, palabra cortada, semivocal (*raudo*) o semiconsonante (*medio*, *estudio*). |
+| Asignado a | Reparto del trabajo entre las personas del grupo (véase `repartir`). |
+
 La columna **-d-** solo trae un valor cuando la transcripción ya lo muestra (`elidida (transcrita)`, `ultracorrección (transcrita)`); el resto lo decide el grupo escuchando.
+
+## Qué valores se usan para decidir
+
+Por defecto, los de la *[Guía PRESEEA de estudio de la /d/ intervocálica](https://preseea.uah.es/sites/default/files/2022-02/Gu%C3%ADa%20PRESEEA%20de%20estudio%20de%20la%20d%20intervoc%C3%A1lica_Samper,%20Malaver%20y%20Samper%20(2021).pdf)* (Samper, Malaver y Samper, 2021), que es el esquema de los estudios PRESEEA de Madrid, Granada, Sevilla, Las Palmas o Caracas:
+
+- **plena**: la d se oye como aproximante [ð̞] clara;
+- **relajada**: se oye algo, pero muy abierta o breve;
+- **elidida**: no se oye nada entre las vocales (hiato, vocal alargada o diptongo);
+- **no analizable**: solapamiento, ruido, risa o no se oye bien. No es una variante: estos casos no entran en los porcentajes.
+
+Para comparar entre ciudades, la guía agrupa plena y relajada como «retenida» frente a «elidida». Hay otros dos esquemas listos (la dicotomía retenida/elidida y uno fino con *tensa* y dos tipos de elisión) y se pueden escribir valores propios: al procesar en la web, en los ajustes del estudio o con `--esquema` en la terminal. Si el grupo cambia de esquema, conviene que lo haga todo el mundo a la vez.
+
+La guía excluye además algunos contextos: la d entre palabras, las palabras cortadas y los contactos con semivocal o semiconsonante (*raudo*, *medio*, *estudio*), donde la d se conserva casi siempre. Esos casos no se borran (así los ID no cambian), pero la columna «Guía PRESEEA» dice por qué quedarían fuera.
 
 ## Cómo encuentra los casos
 
@@ -88,6 +104,15 @@ node cli/socio.mjs categorizar analisis --todo      # repetir la categorización
 ```
 
 Cada carpeta de entrada tiene `Audios/` y `Transcripciones/`. Opciones de `procesar`: `--frontera`, `--sin-otras-lenguas`, `--sin-extranjero`, `--sin-jev`, `--margen 2`, `--solo BARC_H21_085,BARC_M13_001`. Si vuelves a procesar encima de una carpeta, se conserva lo que ya estuviera rellenado. Los ID se asignan en orden dentro de cada entrevista, así que cambiar las opciones de búsqueda cambia los ID: decidid las opciones antes de empezar a rellenar.
+
+### Repartir el trabajo
+
+```sh
+node cli/socio.mjs repartir analisis --entre "Ana,Luis,Marta"   # partes iguales, columna «Asignado a»
+node cli/socio.mjs paquetes analisis                            # un ZIP por persona y uno completo
+```
+
+Cada entrevista va entera a una persona según un cuadrado latino sobre edad y nivel de estudios, de modo que todas escuchan hombres y mujeres de las tres edades, los tres niveles y todas las ciudades; después se igualan los totales partiendo las menos entrevistas posibles. En el estudio, al escribir el nombre en Ajustes se filtran los casos propios y el progreso cuenta solo esos.
 
 ### Hoja de Google compartida
 

@@ -59,6 +59,7 @@
   .valores button { background: #fbf8f1; color: var(--tinta); border: 1px solid var(--linea); padding: .55rem 1rem; }
   .valores button.sel { background: var(--terracota); color: #fff; border-color: var(--terracota); }
   .valores button kbd { margin-right: .35rem; }
+  .leyenda { color: var(--gris); font-size: .85rem; margin: -.4rem 0 1rem; }
   .transcrita { color: var(--ambar); font-size: .9rem; margin: -.4rem 0 .8rem; }
   dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0 0 1rem; font-size: .95rem; }
   dt { color: var(--gris); }
@@ -103,7 +104,8 @@
         <select id="fCiudad"><option value="">Todas las ciudades</option></select>
         <select id="fHablante"><option value="">Todos los hablantes</option></select>
         <select id="fTipo"><option value="">Todos los tipos</option></select>
-        <input id="fTexto" type="search" placeholder="Buscar forma, lema o aviso…">
+        <select id="fAsignado" hidden><option value="">Asignados a cualquiera</option></select>
+        <input id="fTexto" type="search" placeholder="Buscar forma, lema, aviso o «excluido»…">
       </div>
       <div class="cuenta" id="cuenta"></div>
       <ul id="lista"></ul>
@@ -116,8 +118,9 @@
   <form method="dialog">
     <h2 style="font-weight:normal;margin-top:0">Ajustes</h2>
     <p><label>Tu nombre (columna «Revisor»)<br><input id="ajRevisor" style="width:100%"></label></p>
-    <p><label>Valores posibles de -d-, separados por comas<br><input id="ajValores" style="width:100%"></label></p>
-    <p style="color:var(--gris);font-size:.9rem">Las teclas 1, 2, 3… eligen estos valores en orden.</p>
+    <p><label>Esquema de valores de -d-<br><select id="ajEsquema" style="width:100%"></select></label></p>
+    <p><label>Valores, uno por línea (<code>valor: explicación</code>); las teclas 1, 2, 3… los eligen en orden<br><textarea id="ajValores" style="width:100%;min-height:130px"></textarea></label></p>
+    <p style="color:var(--gris);font-size:.85rem">El esquema por defecto es el de la <em>Guía PRESEEA de estudio de la /d/ intervocálica</em> (Samper, Malaver y Samper, 2021). Si cambiáis de esquema, hacedlo todo el grupo a la vez.</p>
     <p><button value="ok">Guardar</button> <button class="sec" value="cancel">Cancelar</button></p>
   </form>
 </dialog>
@@ -131,10 +134,18 @@
 // El estudio es un único archivo para que funcione abierto desde el disco (file://),
 // por eso lleva su propio lector y escritor de CSV.
 const $ = (id) => document.getElementById(id);
-const CABECERA = ["Hablante","Ciudad","Ejemplo","Forma","Lema","-d-","Género","Edad","Educación","ID","Forma estándar","Tipo","Posición","Terminación","Acento","Categoría","Confianza Jev","Lengua","Aviso","Años","Inicio","Fin","Alineación","Recorte","Enlace","Revisor","Notas"];
+const CABECERA = ["Hablante","Ciudad","Ejemplo","Forma","Lema","-d-","Género","Edad","Educación","ID","Forma estándar","Tipo","Posición","Terminación","Acento","Categoría","Confianza Jev","Lengua","Aviso","Años","Inicio","Fin","Alineación","Recorte","Enlace","Revisor","Notas","Asignado a"];
 const EDITABLES = ["-d-", "Lema", "Categoría", "Revisor", "Notas"];
 const CATEGORIAS = ["participio verbal","adjetivo","sustantivo","verbo","pronombre o determinante","adverbio","nombre propio","otra"];
-const VALORES = ["mantenida", "relajada", "elidida", "no se oye"];
+// Mismos esquemas que public/motor/valores.js (copiados aquí para que el estudio funcione sin conexión).
+const NO_ANALIZABLE = ["no analizable", "solapamiento, ruido, risa o no se oye bien: no cuenta en los porcentajes (anotad el motivo en Notas)"];
+const ESQUEMAS = {
+  guia: { nombre: "Guía PRESEEA: plena, relajada, elidida", valores: [["plena", "la d se oye como aproximante [ð̞] clara"], ["relajada", "se oye algo, pero muy abierta o breve"], ["elidida", "no se oye nada entre las vocales (hiato, vocal alargada o diptongo)"], NO_ANALIZABLE] },
+  dicotomia: { nombre: "Dicotomía: retenida, elidida", valores: [["retenida", "se oye la d, plena o relajada"], ["elidida", "no se oye nada entre las vocales"], NO_ANALIZABLE] },
+  fina: { nombre: "Fina: tensa, plena, relajada, elidida con hiato, elidida con diptongo", valores: [["tensa", "casi oclusiva [d]"], ["plena", "aproximante [ð̞] clara"], ["relajada", "muy abierta o breve"], ["elidida con hiato", "sin d; las dos vocales se mantienen (can-sa-o)"], ["elidida con diptongo", "sin d; las vocales se funden o forman diptongo (cansáu)"], NO_ANALIZABLE] },
+};
+const deEsquema = (k) => ESQUEMAS[k].valores.map(([v, d]) => ({ v, d }));
+let valores = deEsquema("guia"), claveValores = "";
 
 function leerCSV(texto) {
   texto = texto.replace(/^﻿/, "");
@@ -158,7 +169,7 @@ const escribirCSV = (filas, cab) => "﻿" + [cab.map(campo).join(";"), ...filas.
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
 
 let filas = [], cabecera = CABECERA, audio = (ruta) => ruta, clave = "", ediciones = {}, visibles = [], actual = -1;
-let ajustes = JSON.parse(localStorage.getItem("estudio-d:ajustes") || "null") || { revisor: "", valores: VALORES };
+let ajustes = { revisor: "", ...JSON.parse(localStorage.getItem("estudio-d:ajustes") || "{}") };
 const reproductor = new Audio();
 let velocidad = 1, bucle = false;
 
@@ -172,12 +183,20 @@ function empezar(datos, resolverAudio) {
   audio = resolverAudio;
   clave = "estudio-d:" + (filas[0]?.ID || "") + ":" + filas.length;
   ediciones = JSON.parse(localStorage.getItem(clave) || "{}");
+  // Valores: los que haya elegido esta persona en este estudio; si no, los del paquete; si no, la Guía.
+  claveValores = clave + ":valores";
+  const guardados = JSON.parse(localStorage.getItem(claveValores) || "null");
+  const delPaquete = datos.info && Array.isArray(datos.info.valores) && datos.info.valores.length ? datos.info.valores : null;
+  valores = guardados || delPaquete || deEsquema("guia");
   $("carga").style.display = "none";
   $("estudio").style.display = "grid";
   const opciones = (sel, valores) => { for (const v of valores) sel.append(new Option(v, v)); };
   opciones($("fCiudad"), [...new Set(filas.map((f) => f.Ciudad))].sort());
   opciones($("fHablante"), [...new Set(filas.map((f) => f.Hablante))].sort());
   opciones($("fTipo"), [...new Set(filas.map((f) => f.Tipo).filter(Boolean))].sort());
+  // Reparto del trabajo: si hay columna «Asignado a», se filtra por la persona que abre el estudio.
+  const asignados = [...new Set(filas.map((f) => f["Asignado a"]).filter(Boolean))].sort();
+  if (asignados.length > 1) { opciones($("fAsignado"), asignados); $("fAsignado").hidden = false; elegirAsignado(); }
   filtrar();
   if (!ajustes.revisor) setTimeout(abrirAjustes, 300);
 }
@@ -194,6 +213,8 @@ async function abrirZip(file) {
     const raiz = csv.replace(/casos\.csv$/, "");
     const urls = new Map();
     const datos = leerCSV(new TextDecoder().decode(todo[csv]));
+    // El esquema de valores del paquete viaja en casos.json.
+    try { if (todo[raiz + "casos.json"]) datos.info = JSON.parse(new TextDecoder().decode(todo[raiz + "casos.json"])).info; } catch {}
     empezar(datos, (ruta) => {
       if (!urls.has(ruta)) { const b = todo[raiz + ruta]; urls.set(ruta, b ? URL.createObjectURL(new Blob([b], { type: /\.wav$/i.test(ruta) ? "audio/wav" : "audio/mpeg" })) : ""); }
       return urls.get(ruta);
@@ -207,7 +228,9 @@ async function abrirCarpeta(files) {
   const csv = mapa.get("casos.csv");
   if (!csv) { $("cargaEstado").textContent = "En esa carpeta no está casos.csv."; return; }
   const urls = new Map();
-  empezar(leerCSV(await csv.text()), (ruta) => {
+  const datos = leerCSV(await csv.text());
+  try { if (mapa.has("casos.json")) datos.info = JSON.parse(await mapa.get("casos.json").text()).info; } catch {}
+  empezar(datos, (ruta) => {
     if (!urls.has(ruta)) urls.set(ruta, mapa.has(ruta) ? URL.createObjectURL(mapa.get(ruta)) : "");
     return urls.get(ruta);
   });
@@ -234,12 +257,12 @@ function editar(f, col, v) {
 
 // ---------- lista ----------
 function filtrar() {
-  const est = $("fEstado").value, ci = $("fCiudad").value, ha = $("fHablante").value, ti = $("fTipo").value;
+  const est = $("fEstado").value, ci = $("fCiudad").value, ha = $("fHablante").value, ti = $("fTipo").value, as = $("fAsignado").value;
   const q = $("fTexto").value.trim().toLowerCase();
   const idActual = visibles[actual]?.ID;
   visibles = filas.filter((f) =>
-    (!est || (est === "pend" ? !decidido(f) : decidido(f))) && (!ci || f.Ciudad === ci) && (!ha || f.Hablante === ha) && (!ti || f.Tipo === ti) &&
-    (!q || [f.Forma, valor(f, "Lema"), f.Aviso, f["Forma estándar"], valor(f, "Notas")].join(" ").toLowerCase().includes(q)));
+    (!est || (est === "pend" ? !decidido(f) : decidido(f))) && (!ci || f.Ciudad === ci) && (!ha || f.Hablante === ha) && (!ti || f.Tipo === ti) && (!as || f["Asignado a"] === as) &&
+    (!q || [f.Forma, valor(f, "Lema"), f.Aviso, f["Forma estándar"], valor(f, "Notas"), f["Guía PRESEEA"]].join(" ").toLowerCase().includes(q)));
   const lista = $("lista");
   lista.innerHTML = "";
   const frag = document.createDocumentFragment();
@@ -247,7 +270,7 @@ function filtrar() {
     const li = document.createElement("li");
     li.dataset.k = k;
     const v = valor(f, "-d-");
-    li.innerHTML = `<span class="f">${esc(f.Forma)}</span><span class="v ${decidido(f) ? "" : "pend"}">${esc(v || "—")}</span><span class="m">${esc(f.Hablante)} · ${esc(f.Tipo)}${f.Aviso ? " · ⚠" : ""}</span>`;
+    li.innerHTML = `<span class="f">${esc(f.Forma)}</span><span class="v ${decidido(f) ? "" : "pend"}">${esc(v || "—")}</span><span class="m">${esc(f.Hablante)} · ${esc(f.Tipo)}${f.Aviso ? " · ⚠" : ""}${f["Guía PRESEEA"] && f["Guía PRESEEA"] !== "cuenta" ? " · fuera de la Guía" : ""}</span>`;
     frag.append(li);
   });
   lista.append(frag);
@@ -257,13 +280,22 @@ function filtrar() {
   if (visibles.length) mostrar(k, false); else { actual = -1; $("detalle").innerHTML = `<p class="id">No hay casos con estos filtros.</p>`; }
 }
 $("lista").onclick = (e) => { const li = e.target.closest("li"); if (li) mostrar(+li.dataset.k, true); };
-for (const id of ["fEstado", "fCiudad", "fHablante", "fTipo"]) $(id).onchange = filtrar;
+for (const id of ["fEstado", "fCiudad", "fHablante", "fTipo", "fAsignado"]) $(id).onchange = filtrar;
+const sinTildes = (s) => s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().trim();
+function elegirAsignado() {
+  const yo = sinTildes(ajustes.revisor || "");
+  const mio = [...$("fAsignado").options].find((o) => o.value && yo && (sinTildes(o.value) === yo || yo.startsWith(sinTildes(o.value)) || sinTildes(o.value).startsWith(yo)));
+  if (mio) $("fAsignado").value = mio.value;
+}
 $("fTexto").oninput = () => { clearTimeout(filtrar.t); filtrar.t = setTimeout(filtrar, 200); };
 
 function progreso() {
-  const n = filas.filter(decidido).length;
-  $("progTexto").textContent = `${n} de ${filas.length} decididos`;
-  $("progBarra").style.width = (filas.length ? (100 * n) / filas.length : 0) + "%";
+  // Con reparto, el progreso es el de la persona seleccionada.
+  const as = $("fAsignado").value;
+  const base = as ? filas.filter((f) => f["Asignado a"] === as) : filas;
+  const n = base.filter(decidido).length;
+  $("progTexto").textContent = `${n} de ${base.length} decididos${as ? ` (${as})` : ""}`;
+  $("progBarra").style.width = (base.length ? (100 * n) / base.length : 0) + "%";
 }
 
 // ---------- detalle ----------
@@ -276,7 +308,8 @@ function mostrar(k, sonar) {
   const f = visibles[k];
   const ejemplo = esc(f.Ejemplo).replace(/\[([^\]]*)\]/, "<mark>$1</mark>");
   const vd = valor(f, "-d-");
-  const botones = ajustes.valores.map((v, i) => `<button data-v="${esc(v)}" class="${vd === v ? "sel" : ""}"><kbd>${i + 1}</kbd>${esc(v)}</button>`).join("");
+  const botones = valores.map(({ v, d }, i) => `<button data-v="${esc(v)}" title="${esc(d || "")}" class="${vd === v ? "sel" : ""}"><kbd>${i + 1}</kbd>${esc(v)}</button>`).join("");
+  const leyenda = valores.filter((x) => x.d).map(({ v, d }) => `<b>${esc(v)}</b>: ${esc(d)}`).join(" · ");
   const opcionesCat = ["", ...CATEGORIAS].map((c) => `<option ${valor(f, "Categoría") === c ? "selected" : ""}>${esc(c)}</option>`).join("");
   const src = f.Recorte ? audio(f.Recorte) : "";
   $("detalle").innerHTML = `
@@ -289,6 +322,7 @@ function mostrar(k, sonar) {
       ${src ? "" : `<span class="id">Sin recorte de audio para este caso.</span>`}
     </div>
     <div class="valores">${botones}</div>
+    ${leyenda ? `<p class="leyenda">${leyenda}</p>` : ""}
     ${/transcrita/.test(f["-d-"]) ? `<p class="transcrita">La transcripción ya marca: ${esc(f["-d-"])}. Escúchalo y decide.</p>` : ""}
     <dl>
       <dt>Forma</dt><dd>${esc(f.Forma)}${f["Forma estándar"] && f["Forma estándar"] !== f.Forma.toLowerCase() ? ` → ${esc(f["Forma estándar"])}` : ""}</dd>
@@ -296,12 +330,13 @@ function mostrar(k, sonar) {
       <dt>Categoría</dt><dd><select id="eCat">${opcionesCat}</select> ${f["Confianza Jev"] ? `<span class="id">Jev ${esc(f["Confianza Jev"])}</span>` : ""}</dd>
       <dt>Tipo</dt><dd>${esc(f.Tipo)} · ${esc(f["Posición"])}${f["Terminación"] ? " · " + esc(f["Terminación"]) : ""}${f.Acento ? " · " + esc(f.Acento) : ""}</dd>
       <dt>Lengua</dt><dd>${esc(f.Lengua)}</dd>
+      ${f["Guía PRESEEA"] && f["Guía PRESEEA"] !== "cuenta" ? `<dt>Guía PRESEEA</dt><dd class="avisos"><span>${esc(f["Guía PRESEEA"])}: la guía no cuenta este contexto</span></dd>` : ""}
       ${f.Aviso ? `<dt>Avisos</dt><dd class="avisos">${f.Aviso.split("; ").map((a) => `<span>${esc(a)}</span>`).join("")}</dd>` : ""}
       ${f.Enlace ? `<dt>Drive</dt><dd><a href="${esc(f.Enlace)}" target="_blank" rel="noopener">abrir el recorte</a></dd>` : ""}
       <dt>Revisor</dt><dd>${esc(valor(f, "Revisor")) || "—"}</dd>
     </dl>
     <textarea id="eNotas" placeholder="Notas sobre este caso…">${esc(valor(f, "Notas"))}</textarea>
-    <p class="ayuda"><kbd>↑</kbd> <kbd>↓</kbd> caso anterior y siguiente · <kbd>1</kbd>…<kbd>${ajustes.valores.length}</kbd> elegir valor y pasar al siguiente · <kbd>espacio</kbd> escuchar · <kbd>L</kbd> lento · <kbd>B</kbd> bucle · <kbd>0</kbd> borrar el valor</p>`;
+    <p class="ayuda"><kbd>↑</kbd> <kbd>↓</kbd> caso anterior y siguiente · <kbd>1</kbd>…<kbd>${valores.length}</kbd> elegir valor y pasar al siguiente · <kbd>espacio</kbd> escuchar · <kbd>L</kbd> lento · <kbd>B</kbd> bucle · <kbd>0</kbd> borrar el valor</p>`;
   $("bPlay").onclick = () => sonarCaso();
   $("bLento").onclick = () => { velocidad = velocidad < 1 ? 1 : 0.6; mostrar(actual, false); sonarCaso(); };
   $("bBucle").onclick = () => { bucle = !bucle; mostrar(actual, false); sonarCaso(); };
@@ -341,7 +376,7 @@ document.addEventListener("keydown", (e) => {
   else if (e.key === "l" || e.key === "L") $("bLento")?.click();
   else if (e.key === "b" || e.key === "B") $("bBucle")?.click();
   else if (e.key === "0") elegir("", false);
-  else if (/^[1-9]$/.test(e.key) && ajustes.valores[+e.key - 1]) elegir(ajustes.valores[+e.key - 1]);
+  else if (/^[1-9]$/.test(e.key) && valores[+e.key - 1]) elegir(valores[+e.key - 1].v);
 });
 
 // ---------- exportar y fusionar ----------
@@ -383,16 +418,26 @@ $("importar").onchange = async (e) => {
 
 function abrirAjustes() {
   $("ajRevisor").value = ajustes.revisor;
-  $("ajValores").value = ajustes.valores.join(", ");
+  $("ajValores").value = valores.map(({ v, d }) => (d ? `${v}: ${d}` : v)).join("\n");
+  const actualEsq = Object.keys(ESQUEMAS).find((k) => JSON.stringify(deEsquema(k)) === JSON.stringify(valores)) || "propio";
+  $("ajEsquema").value = actualEsq;
   $("dlgAjustes").showModal();
 }
 $("btnAjustes").onclick = abrirAjustes;
+for (const [k, e] of Object.entries(ESQUEMAS)) $("ajEsquema").append(new Option(e.nombre, k));
+$("ajEsquema").append(new Option("Propio (editad la lista de abajo)", "propio"));
+$("ajEsquema").onchange = (e) => { if (ESQUEMAS[e.target.value]) $("ajValores").value = deEsquema(e.target.value).map(({ v, d }) => `${v}: ${d}`).join("\n"); };
 $("dlgAjustes").onclose = () => {
   if ($("dlgAjustes").returnValue !== "ok") return;
-  const valores = $("ajValores").value.split(",").map((s) => s.trim()).filter(Boolean);
-  ajustes = { revisor: $("ajRevisor").value.trim(), valores: valores.length ? valores.slice(0, 9) : VALORES };
+  const nuevos = $("ajValores").value.split("\n").map((l) => l.trim()).filter(Boolean).slice(0, 9).map((l) => {
+    const i = l.indexOf(":");
+    return i > 0 ? { v: l.slice(0, i).trim(), d: l.slice(i + 1).trim() } : { v: l, d: "" };
+  });
+  ajustes = { revisor: $("ajRevisor").value.trim() };
   localStorage.setItem("estudio-d:ajustes", JSON.stringify(ajustes));
-  if (actual >= 0) mostrar(actual, false);
+  if (nuevos.length) { valores = nuevos; localStorage.setItem(claveValores, JSON.stringify(valores)); }
+  if (!$("fAsignado").hidden) { elegirAsignado(); filtrar(); }
+  else if (actual >= 0) mostrar(actual, false);
 };
 
 // Arranque: si el estudio lleva los datos dentro (va en el ZIP), se abre directamente.

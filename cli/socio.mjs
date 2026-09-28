@@ -2,12 +2,15 @@
 // socio: la misma herramienta que sociolinguistica.joseluissaorin.com, desde la terminal.
 //
 //   socio procesar <carpeta> [<carpeta>…] --salida <dir> [--frontera] [--sin-otras-lenguas]
-//                  [--sin-extranjero] [--sin-jev] [--solo CLAVE,CLAVE] [--margen 1.5]
+//                  [--sin-extranjero] [--sin-jev] [--solo CLAVE,CLAVE] [--margen 1.5] [--esquema guia|dicotomia|fina]
 //       Cada carpeta tiene Audios/*.mp3 y Transcripciones/*.txt (como las que da preseea-descargas).
 //   socio categorizar <dir>                         Pasa por Jev los casos que aún no lo estén.
 //   socio hoja <dir> --carpeta <idDrive> [--cuenta correo]
 //       Sube los recortes a Drive, rellena «Enlace» y crea la hoja de cálculo compartida.
 //   socio sincronizar <dir> [--cuenta correo]       Fusiona casos.csv con la hoja (en los dos sentidos).
+//   socio repartir <dir> --entre "Ana,Luis,Marta"   Reparte los casos a partes iguales (columna «Asignado a»).
+//   socio paquetes <dir>                            Un ZIP por persona (sus casos y recortes) y uno completo.
+//   socio esquema <dir> guia|dicotomia|fina         Cambia los valores de -d- del estudio y de la hoja.
 //
 // Variables: SOCIO_URL (por defecto la web pública) y SOCIO_CLAVE_ADMIN (opcional, sin límite de uso).
 import { readFileSync, writeFileSync, existsSync, mkdirSync, readdirSync } from "node:fs";
@@ -22,6 +25,7 @@ import { procesarEntrevista, MARGEN } from "../public/motor/proceso.js";
 import { empaquetar, reempaquetar } from "../public/motor/salida.js";
 import { categorizar } from "../public/motor/jev.js";
 import { leerCSV, escribirCSV, fusionar, CABECERA, EDITABLES } from "../public/motor/csv.js";
+import { ESQUEMAS, valoresDe } from "../public/motor/valores.js";
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const secretos = join(homedir(), ".claude/.secrets/sociolinguistica.env");
@@ -101,7 +105,7 @@ function conservarEdiciones(dir, archivos) {
   for (const f of nuevo.filas) {
     const v = V.get(f.ID); if (!v) continue;
     // Los valores «(transcrita)» los pone la máquina: no se arrastran.
-    for (const col of ["-d-", "Revisor", "Notas", "Enlace"]) if (v[col] && !f[col] && !/transcrita/.test(v[col])) { f[col] = v[col]; n++; }
+    for (const col of ["-d-", "Revisor", "Notas", "Enlace", "Asignado a"]) if (v[col] && !f[col] && !/transcrita/.test(v[col])) { f[col] = v[col]; n++; }
   }
   if (n) { archivos.set("casos.csv", new TextEncoder().encode(escribirCSV(nuevo.filas, nuevo.cabecera))); log(`Conservadas ${n} casillas ya rellenas.`); }
 }
@@ -149,7 +153,8 @@ async function procesar() {
     const r = await categorizar(todos, enviarJev, { simultaneos: 4, progreso: (h, n, err) => process.stderr.write(`\r  ${h}/${n}${err ? ` · ${err} errores` : ""}   `) });
     log(`\n  hecho (${r.errores} errores)`);
   }
-  const info = { generado: new Date().toISOString().slice(0, 16).replace("T", " "), herramienta: "socio (CLI)", opciones, margen, jev };
+  const esquema = ESQUEMAS[op.esquema] ? op.esquema : "guia";
+  const info = { generado: new Date().toISOString().slice(0, 16).replace("T", " "), herramienta: "socio (CLI)", opciones, margen, jev, esquema, valores: valoresDe(esquema) };
   const archivos = empaquetar(entrevistas, { plantillaEstudio: readFileSync(join(RAIZ, "public/estudio.html"), "utf8"), info });
   conservarEdiciones(salida, archivos);
   escribir(salida, archivos);
@@ -220,7 +225,8 @@ async function hoja() {
     if (pest && pest.title !== "casos") gog(["sheets", "rename-tab", est.hoja, pest.title, "casos"], cuenta);
     // Cabecera fija y desplegable en la columna -d- (sin bloquear otros valores).
     gog(["sheets", "freeze", est.hoja, "--rows", "1", "--sheet", "casos"], cuenta);
-    const valores = (op.valores || "mantenida,relajada,elidida,no se oye,elidida (transcrita),ultracorrección (transcrita)").split(",");
+    const info = existsSync(join(dir, "casos.json")) ? JSON.parse(readFileSync(join(dir, "casos.json"), "utf8")).info : {};
+    const valores = [...(info.valores || valoresDe("guia")).map((x) => x.v), "elidida (transcrita)", "ultracorrección (transcrita)"];
     gog(["sheets", "validation", "set", est.hoja, `casos!F2:F${filas.length + 1}`, "--type", "ONE_OF_LIST", ...valores.flatMap((v) => ["--value", v.trim()]), "--no-strict", "--show-custom-ui"], cuenta);
     log(`Hoja creada: https://docs.google.com/spreadsheets/d/${est.hoja}`);
   } else {
@@ -254,9 +260,111 @@ async function sincronizar() {
   }
 }
 
-const ORDENES = { procesar, categorizar: recategorizar, hoja, sincronizar };
+// Reparte los casos entre varias personas a partes iguales. Cada entrevista va entera a una persona
+// según un cuadrado latino sobre edad y nivel de estudios (así cada una escucha de todo: sexos,
+// edades, niveles y ciudades); después se igualan los totales pasando los últimos casos de alguna
+// entrevista de quien tiene de más a quien tiene de menos.
+async function repartir() {
+  const dir = resolve(pos[0] || ".");
+  const nombres = String(op.entre || "").split(",").map((s) => s.trim()).filter(Boolean);
+  if (nombres.length < 2) throw new Error('Uso: socio repartir <dir> --entre "Ana,Luis,Marta"');
+  const p = join(dir, "casos.csv");
+  const { filas, cabecera } = leerCSV(readFileSync(p, "utf8"));
+  const cab = cabecera.includes("Asignado a") ? cabecera : [...cabecera, "Asignado a"];
+  const n = nombres.length;
+  const porEntrevista = new Map();
+  for (const f of filas) { if (!porEntrevista.has(f.Hablante)) porEntrevista.set(f.Hablante, []); porEntrevista.get(f.Hablante).push(f); }
+  const ciudades = [...new Set(filas.map((f) => f.Ciudad))].sort();
+  // Objetivo por ciudad: partes iguales; los restos se reparten en rueda para que los totales cuadren.
+  let rueda = 0;
+  for (const ciudad of ciudades) {
+    const entrevistas = [...porEntrevista].filter(([, fs]) => fs[0].Ciudad === ciudad).sort();
+    const total = entrevistas.reduce((t, [, fs]) => t + fs.length, 0);
+    const meta = new Array(n).fill(Math.floor(total / n));
+    for (let r = 0; r < total % n; r++) meta[(rueda++) % n]++;
+    const carga = new Array(n).fill(0);
+    for (const [clave, fs] of entrevistas) {
+      const m = clave.match(/_([HM])(\d)(\d)_/) || [0, "H", 1, 1];
+      const k = (+m[2] + +m[3] + (m[1] === "M" ? 1 : 0) + ciudades.indexOf(ciudad)) % n;
+      for (const f of fs) f["Asignado a"] = nombres[k];
+      carga[k] += fs.length;
+    }
+    // Igualar: primero entrevistas enteras que quepan; si no, el final de una entrevista.
+    for (let vuelta = 0; vuelta < 100; vuelta++) {
+      const mas = [...carga.keys()].sort((x, y) => (carga[y] - meta[y]) - (carga[x] - meta[x]))[0];
+      const menos = [...carga.keys()].sort((x, y) => (carga[x] - meta[x]) - (carga[y] - meta[y]))[0];
+      const cuantos = Math.min(carga[mas] - meta[mas], meta[menos] - carga[menos]);
+      if (cuantos <= 0) break;
+      const suyas = entrevistas.map(([, fs]) => fs.filter((f) => f["Asignado a"] === nombres[mas])).filter((fs) => fs.length);
+      const enteras = suyas.filter((fs) => fs.length <= cuantos).sort((x, y) => y.length - x.length);
+      const trozo = enteras.length ? enteras[0] : suyas.sort((x, y) => x.length - y.length)[0].slice(-cuantos);
+      for (const f of trozo) f["Asignado a"] = nombres[menos];
+      carga[mas] -= trozo.length; carga[menos] += trozo.length;
+    }
+  }
+  writeFileSync(p, escribirCSV(filas, cab));
+  for (const [i, nom] of nombres.entries()) {
+    const suyas = filas.filter((f) => f["Asignado a"] === nom);
+    const entrevistas = new Set(suyas.map((f) => f.Hablante));
+    const porCiudad = ciudades.map((c) => `${c} ${suyas.filter((f) => f.Ciudad === c).length}`).join(", ");
+    log(`${nom}: ${suyas.length} casos de ${entrevistas.size} entrevistas (${porCiudad})`);
+  }
+}
+
+// Cambia el esquema de valores de un análisis ya hecho: casos.json, estudio.html y desplegable de la hoja.
+async function esquema() {
+  const dir = resolve(pos[0] || ".");
+  const clave = pos[1] || op.esquema;
+  if (!ESQUEMAS[clave]) throw new Error(`Esquemas: ${Object.keys(ESQUEMAS).join(", ")}`);
+  const json = JSON.parse(readFileSync(join(dir, "casos.json"), "utf8"));
+  json.info.esquema = clave; json.info.valores = valoresDe(clave);
+  const archivos = reempaquetar(json, { plantillaEstudio: readFileSync(join(RAIZ, "public/estudio.html"), "utf8"), csvAnterior: readFileSync(join(dir, "casos.csv"), "utf8") });
+  escribir(dir, archivos);
+  const est = existsSync(estado(dir)) ? JSON.parse(readFileSync(estado(dir), "utf8")) : {};
+  if (est.hoja) {
+    const cuenta = op.cuenta || est.cuenta || CUENTA();
+    const valores = [...json.info.valores.map((x) => x.v), "elidida (transcrita)", "ultracorrección (transcrita)"];
+    gog(["sheets", "validation", "set", est.hoja, `casos!F2:F${json.casos.length + 1}`, "--type", "ONE_OF_LIST", ...valores.flatMap((v) => ["--value", v]), "--no-strict", "--show-custom-ui"], cuenta);
+  }
+  log(`Esquema «${ESQUEMAS[clave].nombre}» aplicado.`);
+}
+
+// Un ZIP por persona con sus casos, sus recortes y un estudio que solo muestra lo suyo,
+// más el paquete completo. Van a <dir>/Paquetes/.
+async function paquetes() {
+  const dir = resolve(pos[0] || ".");
+  const { zipSync } = await import("fflate");
+  const plantilla = readFileSync(join(RAIZ, "public/estudio.html"), "utf8");
+  const json = JSON.parse(readFileSync(join(dir, "casos.json"), "utf8"));
+  const { filas, cabecera } = leerCSV(readFileSync(join(dir, "casos.csv"), "utf8"));
+  const enc = new TextEncoder();
+  const leeme = readFileSync(join(dir, "LEEME.txt"));
+  const salida = join(dir, "Paquetes");
+  mkdirSync(salida, { recursive: true });
+  const armar = (nombreZip, suyas, nota) => {
+    const ids = new Set(suyas.map((f) => f.ID));
+    const archivos = {
+      "casos.csv": enc.encode(escribirCSV(suyas, cabecera)),
+      "casos.json": enc.encode(JSON.stringify({ ...json, casos: json.casos.filter((c) => ids.has(c.id)) })),
+      "estudio.html": enc.encode(incrustarFilas(plantilla, suyas, json.info)),
+      "LEEME.txt": nota ? enc.encode(nota + "\n\n" + new TextDecoder().decode(leeme)) : leeme,
+    };
+    for (const r of new Set(suyas.map((f) => f.Recorte).filter(Boolean))) archivos[r] = [readFileSync(join(dir, r)), { level: 0 }];
+    writeFileSync(join(salida, nombreZip), zipSync(archivos, { level: 6 }));
+    log(`  ${nombreZip}: ${suyas.length} casos`);
+  };
+  const personas = [...new Set(filas.map((f) => f["Asignado a"]).filter(Boolean))];
+  for (const p of personas) armar(`Estudio de ${p}.zip`, filas.filter((f) => f["Asignado a"] === p), `Paquete de ${p}: ${filas.filter((f) => f["Asignado a"] === p).length} casos asignados.`);
+  armar("Estudio completo.zip", filas, "");
+}
+function incrustarFilas(plantilla, filas, info) {
+  const datos = JSON.stringify({ info, filas }).replace(/<\//g, "<\\/");
+  return plantilla.replace(/<script id="datos" type="application\/json">[\s\S]*?<\/script>/, () => `<script id="datos" type="application/json">${datos}</script>`);
+}
+
+const ORDENES = { procesar, categorizar: recategorizar, hoja, sincronizar, repartir, esquema, paquetes };
 if (!ORDENES[orden]) {
-  console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 15).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
+  console.log(readFileSync(fileURLToPath(import.meta.url), "utf8").split("\n").slice(1, 19).map((l) => l.replace(/^\/\/ ?/, "")).join("\n"));
   process.exit(orden ? 1 : 0);
 }
 ORDENES[orden]().catch((e) => { log("Error:", e.message); process.exit(1); });

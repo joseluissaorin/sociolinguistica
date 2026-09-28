@@ -22,6 +22,7 @@ export const COLUMNAS = [
   ["Categoría", (c) => c.categoria],
   ["Confianza Jev", (c) => (c.confianzaJev === undefined ? "" : c.confianzaJev + " %")],
   ["Lengua", (c) => c.lengua],
+  ["Guía PRESEEA", (c) => c.guia],
   ["Aviso", (c) => (c.avisos || []).join("; ")],
   ["Años", (c) => c.anos],
   ["Inicio", (c) => num(c.inicio)],
@@ -31,11 +32,12 @@ export const COLUMNAS = [
   ["Enlace", (c) => c.enlace],
   ["Revisor", (c) => c.revisor],
   ["Notas", (c) => c.notas],
+  ["Asignado a", (c) => c.asignado],
 ];
 export const CABECERA = COLUMNAS.map(([n]) => n);
 
 // Columnas que rellena el grupo: son las que se fusionan al sincronizar.
-export const EDITABLES = ["-d-", "Lema", "Categoría", "Revisor", "Notas"];
+export const EDITABLES = ["-d-", "Lema", "Categoría", "Revisor", "Notas", "Asignado a"];
 
 const campo = (v) => {
   const s = v === undefined || v === null ? "" : String(v);
@@ -94,7 +96,8 @@ export function fusionar(base, local, remoto, columnas = EDITABLES) {
     const l = L.get(id), r = R.get(id), b = B.get(id) || {};
     if (!l) return { ...r };
     if (!r) return { ...l };
-    const f = { ...r, ...Object.fromEntries(Object.entries(l).filter(([k]) => !columnas.includes(k) && !(k in r))) };
+    // Las columnas calculadas mandan desde el análisis local; las del grupo se fusionan abajo.
+    const f = { ...r, ...Object.fromEntries(Object.entries(l).filter(([k]) => !columnas.includes(k))) };
     for (const col of columnas) {
       const vb = (b[col] ?? "").trim(), vl = (l[col] ?? "").trim(), vr = (r[col] ?? "").trim();
       if (vl === vr) f[col] = vl;

@@ -100,3 +100,15 @@ test("CSV de ida y vuelta con punto y coma y comillas", () => {
 test("una palabra cortada no es una elisión", () => {
   assert.equal(casos("I: y to <palabra_cortada/> todos").filter((c) => c.tipo === "elisión escrita").length, 0);
 });
+
+test("exclusiones de la Guía PRESEEA: semiconsonante, semivocal, entre palabras", () => {
+  assert.equal(uno("I: en medio", "medio").guia, "excluido: semiconsonante");
+  assert.equal(uno("I: un estudio", "estudio").guia, "excluido: semiconsonante");
+  assert.equal(uno("I: muy raudo", "raudo").guia, "excluido: semivocal");
+  assert.equal(uno("I: estoy cansado", "cansado").guia, "cuenta");
+  assert.equal(casos("I: me dijo", { frontera: true }).find((c) => c.forma === "dijo").guia, "excluido: entre palabras");
+});
+
+test("cuidado y ruido sí cuentan (la i es núcleo)", () => {
+  assert.equal(uno("I: con cuidado", "cuidado").guia, "cuenta");
+});
