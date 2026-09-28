@@ -85,9 +85,11 @@ export function aplicar(caso, answers) {
   if (answers.elision) {
     const p = answers.elision.noul;
     caso.probElision = Math.round(p * 100);
-    if (p < 0.2) { avisos.push(`Jev: no parece elisión (${caso.probElision} %)`); caso.descartado = true; }
-    else if (p >= 0.8 && caso.ambigua) caso.d = "elidida (transcrita)";
-    if (p >= 0.2) caso.descartado = false;
+    // Por debajo del 35 %, otra palabra (prefería no es preferida); entre el 35 % y el 80 %, a revisar.
+    caso.descartado = p < 0.35;
+    if (caso.descartado) { avisos.push(`Jev: no parece elisión (${caso.probElision} %)`); caso.d = ""; }
+    else if (p < 0.8) { avisos.push(`Jev duda de la elisión (${caso.probElision} %)`); caso.d = ""; }
+    else caso.d = "elidida (transcrita)";
   }
   caso.avisos = avisos;
   caso.jev = true;

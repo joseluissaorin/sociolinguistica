@@ -100,7 +100,8 @@ function conservarEdiciones(dir, archivos) {
   let n = 0;
   for (const f of nuevo.filas) {
     const v = V.get(f.ID); if (!v) continue;
-    for (const col of ["-d-", "Revisor", "Notas", "Enlace"]) if (v[col] && !f[col]) { f[col] = v[col]; n++; }
+    // Los valores «(transcrita)» los pone la máquina: no se arrastran.
+    for (const col of ["-d-", "Revisor", "Notas", "Enlace"]) if (v[col] && !f[col] && !/transcrita/.test(v[col])) { f[col] = v[col]; n++; }
   }
   if (n) { archivos.set("casos.csv", new TextEncoder().encode(escribirCSV(nuevo.filas, nuevo.cabecera))); log(`Conservadas ${n} casillas ya rellenas.`); }
 }

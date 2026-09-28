@@ -29,12 +29,16 @@ export function procesarEntrevista({ texto, nombre, mp3, whisper, lexicos, opcio
     c.inicio = t.ini;
     c.fin = t.fin;
     c.alineacion = t.calidad;
-    if (t.calidad === "dudosa") c.avisos.push("tiempo aproximado");
+    // Si el tiempo es interpolado, el recorte cubre todo el hueco entre las palabras emparejadas
+    // vecinas (hasta 15 s): así la palabra queda dentro aunque la estimación se desvíe.
+    let [r0, r1] = [t.ini, t.fin];
+    if (t.ventana && t.ventana[1] - t.ventana[0] <= 15) { [r0, r1] = t.ventana; c.avisos.push("recorte ampliado"); }
+    else if (t.calidad === "dudosa") c.avisos.push("tiempo aproximado: puede no estar en el recorte");
     // Las dos d de «quedao» comparten recorte.
     if (!porToken.has(c.token)) {
       const ruta = `Recortes/${paraArchivo(ciudad)}/${meta.clave}/${c.id}_${paraArchivo(c.forma) || "palabra"}.${indice ? extension(indice) : "mp3"}`;
       porToken.set(c.token, ruta);
-      if (indice) recortes.set(ruta, cortar(indice, Math.max(0, t.ini - margen), t.fin + margen));
+      if (indice) recortes.set(ruta, cortar(indice, Math.max(0, r0 - margen), r1 + margen));
     }
     c.recorte = porToken.get(c.token);
   });

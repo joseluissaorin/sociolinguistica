@@ -176,7 +176,8 @@ export function detectar(tr, lexicos, opciones = {}, incluir = () => true) {
     const nuevos = [];
     const ds = dsIntervocalicas(w);
     // quedao tiene una d escrita (que-d-) y otra elidida (-ao): salen los dos casos.
-    const r = lex ? restituir(w, lex, lenguaLex) : null;
+    // Una palabra cortada («to… todos») es un arranque fallido, no una elisión.
+    const r = lex && !tok.avisos.has("palabra cortada") ? restituir(w, lex, lenguaLex) : null;
     const std = r ? r.estandar : w;
     let pElidida = -1;
     if (r) {

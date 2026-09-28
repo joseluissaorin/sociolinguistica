@@ -90,7 +90,8 @@ export function alinear(tokens, palabras, duracion, anclas = []) {
     const calidad = b - a <= 6 && hueco <= 4 ? "interpolada" : "dudosa";
     for (let k = a + 1; k < b; k++) {
       const x0 = t0 + (hueco * (k - a - 1)) / (b - a - 1), x1 = t0 + (hueco * (k - a)) / (b - a - 1);
-      tiempos[k] = { ini: +x0.toFixed(2), fin: +Math.max(x1, x0 + 0.15).toFixed(2), calidad };
+      // «ventana»: el hueco entre las dos palabras emparejadas; la palabra está seguro ahí dentro.
+      tiempos[k] = { ini: +x0.toFixed(2), fin: +Math.max(x1, x0 + 0.15).toFixed(2), calidad, ventana: [tiempos[a].ini, tiempos[b].fin] };
     }
   }
   return { tiempos, emparejadas: fijos.length, palabrasWhisper: m, cobertura: m ? fijos.length / m : 0, ultimoToken: fijos.length ? fijos[fijos.length - 1] : -1 };

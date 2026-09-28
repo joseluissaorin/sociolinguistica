@@ -96,3 +96,7 @@ test("CSV de ida y vuelta con punto y coma y comillas", () => {
   const f = [{ A: 'dijo "hola"; adiós', B: "x" }];
   assert.deepEqual(leerCSV(escribirCSV(f, ["A", "B"])).filas, f);
 });
+
+test("una palabra cortada no es una elisión", () => {
+  assert.equal(casos("I: y to <palabra_cortada/> todos").filter((c) => c.tipo === "elisión escrita").length, 0);
+});
