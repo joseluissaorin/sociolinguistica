@@ -127,6 +127,13 @@ export default {
     if (url.pathname === "/api/whisper" && req.method === "POST") return apiWhisper(req, env);
     if (url.pathname === "/api/jev" && req.method === "POST") return apiJev(req, env);
 
+    // Paquetes de estudio subidos por el grupo: /p/<código>.zip (el código hace de contraseña).
+    const pq = url.pathname.match(/^\/p\/([A-Za-z0-9_\-]{10,64})\.zip$/);
+    if (pq && (req.method === "GET" || req.method === "HEAD")) {
+      const o = await env.CACHE.get(`paquetes/${pq[1]}.zip`);
+      if (!o) return new Response("No existe ese paquete", { status: 404 });
+      return new Response(o.body, { headers: { "Content-Type": "application/zip", "Content-Length": String(o.size), "Cache-Control": "private, max-age=3600" } });
+    }
     const m = url.pathname.match(RUTA);
     if (!m) return env.ASSETS.fetch(req);
     const [, tipo, clave, ext] = m;

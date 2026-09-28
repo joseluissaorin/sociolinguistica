@@ -441,8 +441,28 @@ $("dlgAjustes").onclose = () => {
 };
 
 // Arranque: si el estudio lleva los datos dentro (va en el ZIP), se abre directamente.
+// Con ?p=<código>, descarga el paquete del grupo desde la web (sirve también en el móvil).
 const incrustados = JSON.parse($("datos").textContent);
+const codigo = new URLSearchParams(location.search).get("p");
 if (incrustados) empezar(incrustados, (ruta) => ruta);
+else if (codigo) (async () => {
+  const est = $("cargaEstado");
+  try {
+    est.textContent = "Descargando tus casos…";
+    const r = await fetch(`/p/${encodeURIComponent(codigo)}.zip`);
+    if (!r.ok) throw new Error(r.status === 404 ? "el enlace no es correcto" : `error ${r.status}`);
+    const total = +r.headers.get("Content-Length") || 0;
+    const lector = r.body.getReader(), trozos = [];
+    let n = 0;
+    for (;;) {
+      const { done, value } = await lector.read();
+      if (done) break;
+      trozos.push(value); n += value.length;
+      est.textContent = `Descargando tus casos… ${total ? Math.round((100 * n) / total) + " %" : Math.round(n / 1048576) + " MB"}`;
+    }
+    await abrirZip(new Blob(trozos));
+  } catch (e) { est.textContent = "No se pudo descargar el paquete: " + e.message; }
+})();
 </script>
 </body>
 </html>
