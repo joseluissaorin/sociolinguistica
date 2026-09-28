@@ -98,7 +98,20 @@ export function aplicar(caso, answers) {
 
 // Categoriza una lista de casos por lotes. enviar(lote de datosCaso) → [{ answers } | { error }].
 // Solo se envían los que aún no pasaron por Jev (así se puede reanudar).
-export async function categorizar(casos, enviar, { simultaneos = 3, progreso = () => {} } = {}) {
+// Si alguno se queda sin respuesta (Jev saturado), se reintenta en hasta tres rondas más, más despacio.
+export async function categorizar(casos, enviar, { simultaneos = 3, progreso = () => {}, rondas = 4 } = {}) {
+  const total = casos.filter((c) => !c.jev).length;
+  let r = { enviados: 0, errores: 0 };
+  for (let ronda = 0; ronda < rondas; ronda++) {
+    if (ronda) await new Promise((ok) => setTimeout(ok, 3000 * ronda));
+    const hechosAntes = total - casos.filter((c) => !c.jev).length;
+    r = await unaRonda(casos, enviar, ronda ? 1 : simultaneos, (h, n, err) => progreso(hechosAntes + h - err, total, err));
+    if (!r.errores) break;
+  }
+  return { enviados: total, errores: casos.filter((c) => !c.jev).length };
+}
+
+async function unaRonda(casos, enviar, simultaneos, progreso) {
   const pendientes = casos.filter((c) => !c.jev);
   const lotes = [];
   for (let i = 0; i < pendientes.length; i += MAX_POR_LOTE) lotes.push(pendientes.slice(i, i + MAX_POR_LOTE));

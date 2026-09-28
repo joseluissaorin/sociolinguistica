@@ -88,16 +88,26 @@ async function apiJev(req, env) {
 
   const respuestas = await Promise.all(casos.map(async (c) => {
     const cuerpo = JSON.stringify(peticion(datosCaso(c)));
-    for (let intento = 0; intento < 4; intento++) {
-      const r = await fetch("https://api.typesafe.ai/v1/systemone", {
-        method: "POST", body: cuerpo,
-        headers: { Authorization: `Bearer ${env.TYPESAFE_API_KEY}`, "Content-Type": "application/json" },
-      });
-      if (r.ok) return { answers: (await r.json()).answers };
-      if (r.status !== 429 && r.status < 500) return { error: `Jev respondió ${r.status}` };
-      await new Promise((ok) => setTimeout(ok, 500 * 2 ** intento));
+    let ultimo = "";
+    for (let intento = 0; intento < 6; intento++) {
+      try {
+        const r = await fetch("https://api.typesafe.ai/v1/systemone", {
+          method: "POST", body: cuerpo,
+          headers: { Authorization: `Bearer ${env.TYPESAFE_API_KEY}`, "Content-Type": "application/json" },
+        });
+        if (r.ok) return { answers: (await r.json()).answers };
+        ultimo = `Jev respondió ${r.status}`;
+        if (r.status !== 429 && r.status < 500) break;
+        // Respeta Retry-After si viene; si no, espera exponencial con algo de azar.
+        const tras = parseFloat(r.headers.get("retry-after") || "") * 1000;
+        await new Promise((ok) => setTimeout(ok, tras > 0 ? Math.min(tras, 10000) : 400 * 2 ** intento + Math.random() * 400));
+      } catch (e) {
+        ultimo = `Jev no respondió (${e.message})`;
+        await new Promise((ok) => setTimeout(ok, 400 * 2 ** intento));
+      }
     }
-    return { error: "Jev no respondió" };
+    console.log("jev-error", ultimo);
+    return { error: ultimo || "Jev no respondió" };
   }));
   return json({ respuestas });
 }
