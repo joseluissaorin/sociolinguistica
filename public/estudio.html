@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Estudio · -d- intervocálica</title>
+<style>
+  :root { --papel:#f5efe3; --papel2:#efe6d6; --tinta:#2b2622; --gris:#6f655c; --terracota:#b5553c; --linea:#d9cfbf; --verde:#4f6f52; --ambar:#a8741a; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body { margin:0; background:var(--papel); color:var(--tinta); font:16px/1.5 Georgia, "Times New Roman", serif; }
+  button, input, select, textarea { font: inherit; color: inherit; }
+  button { background: var(--terracota); color: #fff; border: 0; border-radius: 4px; padding: .4rem .9rem; cursor: pointer; }
+  button.sec { background: transparent; color: var(--terracota); border: 1px solid var(--terracota); }
+  button:disabled { opacity: .45; cursor: default; }
+  a { color: var(--terracota); }
+  kbd { font: 12px ui-monospace, Menlo, monospace; border: 1px solid var(--linea); border-bottom-width: 2px; border-radius: 3px; padding: 0 .3em; background: #fbf8f1; color: var(--gris); }
+
+  /* Pantalla de carga */
+  #carga { max-width: 720px; margin: 0 auto; padding: 64px 24px; }
+  #carga h1 { font-weight: normal; font-size: 2rem; margin: 0 0 .3rem; }
+  #carga h1 span { color: var(--terracota); }
+  #carga p { color: var(--gris); }
+  .zona { border: 1.5px dashed var(--linea); border-radius: 6px; padding: 32px 20px; text-align: center; cursor: pointer; margin: 1.2rem 0 .6rem; }
+  .zona:hover, .zona.encima { border-color: var(--terracota); background: var(--papel2); }
+  .zona strong { color: var(--terracota); font-weight: normal; text-decoration: underline; }
+
+  /* Estudio */
+  #estudio { display: none; height: 100vh; grid-template-rows: auto 1fr; }
+  header { display: flex; align-items: center; gap: 1rem; padding: .6rem 1rem; border-bottom: 1px solid var(--linea); flex-wrap: wrap; }
+  header h1 { font-weight: normal; font-size: 1.15rem; margin: 0; white-space: nowrap; }
+  header h1 span { color: var(--terracota); }
+  .progreso { flex: 1; min-width: 180px; display: flex; align-items: center; gap: .6rem; color: var(--gris); font-size: .9rem; }
+  .barra { flex: 1; height: 6px; background: var(--linea); border-radius: 3px; overflow: hidden; }
+  .barra i { display: block; height: 100%; background: var(--terracota); width: 0; transition: width .2s; }
+  header .acciones { display: flex; gap: .5rem; }
+  main { display: grid; grid-template-columns: minmax(280px, 380px) 1fr; min-height: 0; }
+  aside { border-right: 1px solid var(--linea); display: flex; flex-direction: column; min-height: 0; }
+  .filtros { padding: .6rem .8rem; display: grid; grid-template-columns: 1fr 1fr; gap: .4rem; border-bottom: 1px solid var(--linea); }
+  .filtros select, .filtros input { width: 100%; background: #fbf8f1; border: 1px solid var(--linea); border-radius: 4px; padding: .25rem .4rem; font-size: .88rem; }
+  .filtros input { grid-column: 1 / -1; }
+  .cuenta { padding: .3rem .8rem; font-size: .82rem; color: var(--gris); border-bottom: 1px solid var(--linea); }
+  #lista { list-style: none; margin: 0; padding: 0; overflow-y: auto; flex: 1; }
+  #lista li { padding: .45rem .8rem; border-bottom: 1px solid #e8dfcf; cursor: pointer; display: grid; grid-template-columns: 1fr auto; gap: .1rem .6rem; font-size: .92rem; }
+  #lista li:hover { background: var(--papel2); }
+  #lista li.activo { background: #e9dcc6; box-shadow: inset 3px 0 0 var(--terracota); }
+  #lista .f { font-weight: bold; }
+  #lista .m { color: var(--gris); font-size: .8rem; grid-column: 1 / -1; }
+  #lista .v { font-size: .8rem; color: var(--verde); text-align: right; }
+  #lista .v.pend { color: var(--gris); }
+
+  section#detalle { overflow-y: auto; padding: 1.4rem 2rem 3rem; }
+  .id { color: var(--gris); font-size: .85rem; }
+  .ejemplo { font-size: 1.35rem; line-height: 1.5; margin: .5rem 0 1rem; }
+  .ejemplo mark { background: none; color: var(--terracota); font-weight: bold; border-bottom: 2px solid var(--terracota); }
+  .audio { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; margin-bottom: 1.2rem; }
+  .audio button.act { background: var(--tinta); }
+  .valores { display: flex; gap: .5rem; flex-wrap: wrap; margin: .4rem 0 1rem; }
+  .valores button { background: #fbf8f1; color: var(--tinta); border: 1px solid var(--linea); padding: .55rem 1rem; }
+  .valores button.sel { background: var(--terracota); color: #fff; border-color: var(--terracota); }
+  .valores button kbd { margin-right: .35rem; }
+  .transcrita { color: var(--ambar); font-size: .9rem; margin: -.4rem 0 .8rem; }
+  dl { display: grid; grid-template-columns: max-content 1fr; gap: .25rem 1rem; margin: 0 0 1rem; font-size: .95rem; }
+  dt { color: var(--gris); }
+  dd { margin: 0; }
+  dd input, dd select { width: 100%; max-width: 360px; background: #fbf8f1; border: 1px solid var(--linea); border-radius: 4px; padding: .2rem .4rem; }
+  textarea { width: 100%; min-height: 70px; background: #fbf8f1; border: 1px solid var(--linea); border-radius: 4px; padding: .4rem; }
+  .avisos span { display: inline-block; font-size: .8rem; background: #f1e1c7; color: #6b4a12; border-radius: 3px; padding: .05rem .45rem; margin: 0 .3rem .3rem 0; }
+  .ayuda { color: var(--gris); font-size: .82rem; margin-top: 2rem; border-top: 1px solid var(--linea); padding-top: .8rem; }
+  dialog { border: 1px solid var(--linea); border-radius: 6px; background: var(--papel); color: var(--tinta); max-width: 560px; }
+  dialog::backdrop { background: rgba(43, 38, 34, .35); }
+  #aviso { position: fixed; bottom: 1rem; left: 50%; transform: translateX(-50%); background: var(--tinta); color: var(--papel); padding: .5rem 1rem; border-radius: 4px; font-size: .9rem; display: none; }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; } aside { max-height: 40vh; } }
+</style>
+</head>
+<body>
+
+<div id="carga">
+  <h1>Estudio <span>-d-</span></h1>
+  <p>Escucha cada caso de -d- intervocálica y decide cómo se realiza. Abre el ZIP que genera la herramienta (o la carpeta ya descomprimida). Lo que marques se guarda en este navegador; al terminar, exporta el CSV.</p>
+  <div class="zona" id="zonaZip" tabindex="0" role="button">Arrastra aquí el ZIP o <strong>elige el archivo</strong></div>
+  <p><button class="sec" id="elegirCarpeta">Abrir una carpeta descomprimida</button></p>
+  <input type="file" id="zip" accept=".zip,application/zip" hidden>
+  <input type="file" id="carpeta" webkitdirectory hidden>
+  <p id="cargaEstado"></p>
+</div>
+
+<div id="estudio">
+  <header>
+    <h1>Estudio <span>-d-</span></h1>
+    <div class="progreso"><span id="progTexto"></span><div class="barra"><i id="progBarra"></i></div></div>
+    <div class="acciones">
+      <button class="sec" id="btnImportar" title="Fusiona el CSV de otra persona del grupo, o el descargado de la hoja de cálculo">Fusionar CSV</button>
+      <button class="sec" id="btnAjustes">Ajustes</button>
+      <button id="btnExportar">Exportar CSV</button>
+    </div>
+    <input type="file" id="importar" accept=".csv,text/csv" hidden multiple>
+  </header>
+  <main>
+    <aside>
+      <div class="filtros">
+        <select id="fEstado"><option value="pend">Pendientes</option><option value="hechos">Decididos</option><option value="">Todos</option></select>
+        <select id="fCiudad"><option value="">Todas las ciudades</option></select>
+        <select id="fHablante"><option value="">Todos los hablantes</option></select>
+        <select id="fTipo"><option value="">Todos los tipos</option></select>
+        <input id="fTexto" type="search" placeholder="Buscar forma, lema o aviso…">
+      </div>
+      <div class="cuenta" id="cuenta"></div>
+      <ul id="lista"></ul>
+    </aside>
+    <section id="detalle"></section>
+  </main>
+</div>
+
+<dialog id="dlgAjustes">
+  <form method="dialog">
+    <h2 style="font-weight:normal;margin-top:0">Ajustes</h2>
+    <p><label>Tu nombre (columna «Revisor»)<br><input id="ajRevisor" style="width:100%"></label></p>
+    <p><label>Valores posibles de -d-, separados por comas<br><input id="ajValores" style="width:100%"></label></p>
+    <p style="color:var(--gris);font-size:.9rem">Las teclas 1, 2, 3… eligen estos valores en orden.</p>
+    <p><button value="ok">Guardar</button> <button class="sec" value="cancel">Cancelar</button></p>
+  </form>
+</dialog>
+
+<div id="aviso"></div>
+
+<!-- Los datos se incrustan aquí cuando el estudio va dentro del ZIP. -->
+<script id="datos" type="application/json">null</script>
+
+<script type="module">
+// El estudio es un único archivo para que funcione abierto desde el disco (file://),
+// por eso lleva su propio lector y escritor de CSV.
+const $ = (id) => document.getElementById(id);
+const CABECERA = ["Hablante","Ciudad","Ejemplo","Forma","Lema","-d-","Género","Edad","Educación","ID","Forma estándar","Tipo","Posición","Terminación","Acento","Categoría","Confianza Jev","Lengua","Aviso","Años","Inicio","Fin","Alineación","Recorte","Enlace","Revisor","Notas"];
+const EDITABLES = ["-d-", "Lema", "Categoría", "Revisor", "Notas"];
+const CATEGORIAS = ["participio verbal","adjetivo","sustantivo","verbo","pronombre o determinante","adverbio","nombre propio","otra"];
+const VALORES = ["mantenida", "relajada", "elidida", "no se oye"];
+
+function leerCSV(texto) {
+  texto = texto.replace(/^﻿/, "");
+  const primera = texto.split(/\r?\n/, 1)[0];
+  const sep = ["\t", ";", ","].map((s) => [s, primera.split(s).length]).sort((a, b) => b[1] - a[1])[0][0];
+  const filas = []; let fila = [], v = "", i = 0, q = false;
+  while (i < texto.length) {
+    const c = texto[i];
+    if (q) { if (c === '"' && texto[i + 1] === '"') { v += '"'; i += 2; continue; } if (c === '"') { q = false; i++; continue; } v += c; i++; continue; }
+    if (c === '"' && v === "") { q = true; i++; continue; }
+    if (c === sep) { fila.push(v); v = ""; i++; continue; }
+    if (c === "\n" || c === "\r") { fila.push(v); v = ""; if (fila.some((f) => f.trim())) filas.push(fila); fila = []; if (c === "\r" && texto[i + 1] === "\n") i++; i++; continue; }
+    v += c; i++;
+  }
+  fila.push(v); if (fila.some((f) => f.trim())) filas.push(fila);
+  const cab = (filas[0] || []).map((s) => s.trim());
+  return { cabecera: cab, filas: filas.slice(1).map((f) => Object.fromEntries(cab.map((n, k) => [n, f[k] ?? ""]))) };
+}
+const campo = (v) => { const s = v == null ? "" : String(v); return /[;"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+const escribirCSV = (filas, cab) => "﻿" + [cab.map(campo).join(";"), ...filas.map((f) => cab.map((n) => campo(f[n])).join(";"))].join("\r\n") + "\r\n";
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" })[c]);
+
+let filas = [], cabecera = CABECERA, audio = (ruta) => ruta, clave = "", ediciones = {}, visibles = [], actual = -1;
+let ajustes = JSON.parse(localStorage.getItem("estudio-d:ajustes") || "null") || { revisor: "", valores: VALORES };
+const reproductor = new Audio();
+let velocidad = 1, bucle = false;
+
+function aviso(t) { const a = $("aviso"); a.textContent = t; a.style.display = "block"; clearTimeout(aviso.t); aviso.t = setTimeout(() => (a.style.display = "none"), 2600); }
+
+// ---------- carga ----------
+function empezar(datos, resolverAudio) {
+  filas = datos.filas;
+  cabecera = datos.cabecera && datos.cabecera.length ? datos.cabecera : CABECERA;
+  for (const c of CABECERA) if (!cabecera.includes(c)) cabecera = [...cabecera, c];
+  audio = resolverAudio;
+  clave = "estudio-d:" + (filas[0]?.ID || "") + ":" + filas.length;
+  ediciones = JSON.parse(localStorage.getItem(clave) || "{}");
+  $("carga").style.display = "none";
+  $("estudio").style.display = "grid";
+  const opciones = (sel, valores) => { for (const v of valores) sel.append(new Option(v, v)); };
+  opciones($("fCiudad"), [...new Set(filas.map((f) => f.Ciudad))].sort());
+  opciones($("fHablante"), [...new Set(filas.map((f) => f.Hablante))].sort());
+  opciones($("fTipo"), [...new Set(filas.map((f) => f.Tipo).filter(Boolean))].sort());
+  filtrar();
+  if (!ajustes.revisor) setTimeout(abrirAjustes, 300);
+}
+
+
+async function abrirZip(file) {
+  $("cargaEstado").textContent = "Abriendo el ZIP…";
+  try {
+    const { unzipSync } = await import("./vendor/fflate.js");
+    const todo = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    const nombres = Object.keys(todo);
+    const csv = nombres.find((n) => /(^|\/)casos\.csv$/.test(n));
+    if (!csv) throw new Error("El ZIP no trae casos.csv");
+    const raiz = csv.replace(/casos\.csv$/, "");
+    const urls = new Map();
+    const datos = leerCSV(new TextDecoder().decode(todo[csv]));
+    empezar(datos, (ruta) => {
+      if (!urls.has(ruta)) { const b = todo[raiz + ruta]; urls.set(ruta, b ? URL.createObjectURL(new Blob([b], { type: /\.wav$/i.test(ruta) ? "audio/wav" : "audio/mpeg" })) : ""); }
+      return urls.get(ruta);
+    });
+  } catch (e) { $("cargaEstado").textContent = "No se pudo abrir: " + e.message; }
+}
+
+async function abrirCarpeta(files) {
+  const mapa = new Map();
+  for (const f of files) mapa.set(f.webkitRelativePath.split("/").slice(1).join("/"), f);
+  const csv = mapa.get("casos.csv");
+  if (!csv) { $("cargaEstado").textContent = "En esa carpeta no está casos.csv."; return; }
+  const urls = new Map();
+  empezar(leerCSV(await csv.text()), (ruta) => {
+    if (!urls.has(ruta)) urls.set(ruta, mapa.has(ruta) ? URL.createObjectURL(mapa.get(ruta)) : "");
+    return urls.get(ruta);
+  });
+}
+
+const zona = $("zonaZip");
+zona.onclick = () => $("zip").click();
+zona.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $("zip").click(); } };
+zona.ondragover = (e) => { e.preventDefault(); zona.classList.add("encima"); };
+zona.ondragleave = () => zona.classList.remove("encima");
+zona.ondrop = (e) => { e.preventDefault(); zona.classList.remove("encima"); if (e.dataTransfer.files[0]) abrirZip(e.dataTransfer.files[0]); };
+$("zip").onchange = (e) => e.target.files[0] && abrirZip(e.target.files[0]);
+$("elegirCarpeta").onclick = () => $("carpeta").click();
+$("carpeta").onchange = (e) => e.target.files.length && abrirCarpeta(e.target.files);
+
+// ---------- valores ----------
+const valor = (f, col) => (ediciones[f.ID] && col in ediciones[f.ID] ? ediciones[f.ID][col] : f[col] ?? "");
+const decidido = (f) => { const v = valor(f, "-d-"); return !!v && !/transcrita/.test(v); };
+function editar(f, col, v) {
+  ediciones[f.ID] = { ...(ediciones[f.ID] || {}), [col]: v };
+  if (col === "-d-" && ajustes.revisor) ediciones[f.ID].Revisor = ajustes.revisor;
+  localStorage.setItem(clave, JSON.stringify(ediciones));
+}
+
+// ---------- lista ----------
+function filtrar() {
+  const est = $("fEstado").value, ci = $("fCiudad").value, ha = $("fHablante").value, ti = $("fTipo").value;
+  const q = $("fTexto").value.trim().toLowerCase();
+  const idActual = visibles[actual]?.ID;
+  visibles = filas.filter((f) =>
+    (!est || (est === "pend" ? !decidido(f) : decidido(f))) && (!ci || f.Ciudad === ci) && (!ha || f.Hablante === ha) && (!ti || f.Tipo === ti) &&
+    (!q || [f.Forma, valor(f, "Lema"), f.Aviso, f["Forma estándar"], valor(f, "Notas")].join(" ").toLowerCase().includes(q)));
+  const lista = $("lista");
+  lista.innerHTML = "";
+  const frag = document.createDocumentFragment();
+  visibles.forEach((f, k) => {
+    const li = document.createElement("li");
+    li.dataset.k = k;
+    const v = valor(f, "-d-");
+    li.innerHTML = `<span class="f">${esc(f.Forma)}</span><span class="v ${decidido(f) ? "" : "pend"}">${esc(v || "—")}</span><span class="m">${esc(f.Hablante)} · ${esc(f.Tipo)}${f.Aviso ? " · ⚠" : ""}</span>`;
+    frag.append(li);
+  });
+  lista.append(frag);
+  $("cuenta").textContent = `${visibles.length} de ${filas.length} casos`;
+  progreso();
+  const k = Math.max(0, visibles.findIndex((f) => f.ID === idActual));
+  if (visibles.length) mostrar(k, false); else { actual = -1; $("detalle").innerHTML = `<p class="id">No hay casos con estos filtros.</p>`; }
+}
+$("lista").onclick = (e) => { const li = e.target.closest("li"); if (li) mostrar(+li.dataset.k, true); };
+for (const id of ["fEstado", "fCiudad", "fHablante", "fTipo"]) $(id).onchange = filtrar;
+$("fTexto").oninput = () => { clearTimeout(filtrar.t); filtrar.t = setTimeout(filtrar, 200); };
+
+function progreso() {
+  const n = filas.filter(decidido).length;
+  $("progTexto").textContent = `${n} de ${filas.length} decididos`;
+  $("progBarra").style.width = (filas.length ? (100 * n) / filas.length : 0) + "%";
+}
+
+// ---------- detalle ----------
+function mostrar(k, sonar) {
+  if (k < 0 || k >= visibles.length) return;
+  actual = k;
+  document.querySelectorAll("#lista li.activo").forEach((li) => li.classList.remove("activo"));
+  const li = $("lista").children[k];
+  if (li) { li.classList.add("activo"); li.scrollIntoView({ block: "nearest" }); }
+  const f = visibles[k];
+  const ejemplo = esc(f.Ejemplo).replace(/\[([^\]]*)\]/, "<mark>$1</mark>");
+  const vd = valor(f, "-d-");
+  const botones = ajustes.valores.map((v, i) => `<button data-v="${esc(v)}" class="${vd === v ? "sel" : ""}"><kbd>${i + 1}</kbd>${esc(v)}</button>`).join("");
+  const opcionesCat = ["", ...CATEGORIAS].map((c) => `<option ${valor(f, "Categoría") === c ? "selected" : ""}>${esc(c)}</option>`).join("");
+  const src = f.Recorte ? audio(f.Recorte) : "";
+  $("detalle").innerHTML = `
+    <div class="id">${esc(f.ID)} · ${esc(f.Ciudad)} · ${esc(f["Género"])}, edad ${esc(f.Edad)}, estudios ${esc(f["Educación"])} · ${esc(f.Inicio)}–${esc(f.Fin)} s</div>
+    <p class="ejemplo">${ejemplo}</p>
+    <div class="audio">
+      <button id="bPlay">▶ Escuchar <kbd>espacio</kbd></button>
+      <button class="sec ${velocidad < 1 ? "act" : ""}" id="bLento">Lento ×0,6 <kbd>L</kbd></button>
+      <button class="sec ${bucle ? "act" : ""}" id="bBucle">En bucle <kbd>B</kbd></button>
+      ${src ? "" : `<span class="id">Sin recorte de audio para este caso.</span>`}
+    </div>
+    <div class="valores">${botones}</div>
+    ${/transcrita/.test(f["-d-"]) ? `<p class="transcrita">La transcripción ya marca: ${esc(f["-d-"])}. Escúchalo y decide.</p>` : ""}
+    <dl>
+      <dt>Forma</dt><dd>${esc(f.Forma)}${f["Forma estándar"] && f["Forma estándar"] !== f.Forma.toLowerCase() ? ` → ${esc(f["Forma estándar"])}` : ""}</dd>
+      <dt>Lema</dt><dd><input id="eLema" value="${esc(valor(f, "Lema"))}"></dd>
+      <dt>Categoría</dt><dd><select id="eCat">${opcionesCat}</select> ${f["Confianza Jev"] ? `<span class="id">Jev ${esc(f["Confianza Jev"])}</span>` : ""}</dd>
+      <dt>Tipo</dt><dd>${esc(f.Tipo)} · ${esc(f["Posición"])}${f["Terminación"] ? " · " + esc(f["Terminación"]) : ""}${f.Acento ? " · " + esc(f.Acento) : ""}</dd>
+      <dt>Lengua</dt><dd>${esc(f.Lengua)}</dd>
+      ${f.Aviso ? `<dt>Avisos</dt><dd class="avisos">${f.Aviso.split("; ").map((a) => `<span>${esc(a)}</span>`).join("")}</dd>` : ""}
+      ${f.Enlace ? `<dt>Drive</dt><dd><a href="${esc(f.Enlace)}" target="_blank" rel="noopener">abrir el recorte</a></dd>` : ""}
+      <dt>Revisor</dt><dd>${esc(valor(f, "Revisor")) || "—"}</dd>
+    </dl>
+    <textarea id="eNotas" placeholder="Notas sobre este caso…">${esc(valor(f, "Notas"))}</textarea>
+    <p class="ayuda"><kbd>↑</kbd> <kbd>↓</kbd> caso anterior y siguiente · <kbd>1</kbd>…<kbd>${ajustes.valores.length}</kbd> elegir valor y pasar al siguiente · <kbd>espacio</kbd> escuchar · <kbd>L</kbd> lento · <kbd>B</kbd> bucle · <kbd>0</kbd> borrar el valor</p>`;
+  $("bPlay").onclick = () => sonarCaso();
+  $("bLento").onclick = () => { velocidad = velocidad < 1 ? 1 : 0.6; mostrar(actual, false); sonarCaso(); };
+  $("bBucle").onclick = () => { bucle = !bucle; mostrar(actual, false); sonarCaso(); };
+  document.querySelectorAll(".valores button").forEach((b) => (b.onclick = () => elegir(b.dataset.v)));
+  $("eLema").onchange = (e) => editar(f, "Lema", e.target.value.trim());
+  $("eCat").onchange = (e) => editar(f, "Categoría", e.target.value);
+  $("eNotas").onchange = (e) => editar(f, "Notas", e.target.value.trim());
+  reproductor.pause();
+  reproductor.src = src;
+  if (sonar && src) sonarCaso();
+}
+
+function sonarCaso() {
+  if (!reproductor.src) return;
+  reproductor.playbackRate = velocidad;
+  reproductor.preservesPitch = true;
+  reproductor.loop = bucle;
+  reproductor.currentTime = 0;
+  reproductor.play().catch(() => {});
+}
+
+function elegir(v, avanzar = true) {
+  const f = visibles[actual];
+  if (!f) return;
+  editar(f, "-d-", v);
+  const li = $("lista").children[actual];
+  if (li) { const s = li.querySelector(".v"); s.textContent = v || "—"; s.classList.toggle("pend", !decidido(f)); }
+  progreso();
+  if (avanzar && actual + 1 < visibles.length) mostrar(actual + 1, true); else mostrar(actual, false);
+}
+
+document.addEventListener("keydown", (e) => {
+  if ($("estudio").style.display !== "grid" || e.target.matches("input, textarea, select") || e.metaKey || e.ctrlKey) return;
+  if (e.key === "ArrowDown" || e.key === "j") { e.preventDefault(); mostrar(actual + 1, true); }
+  else if (e.key === "ArrowUp" || e.key === "k") { e.preventDefault(); mostrar(actual - 1, true); }
+  else if (e.key === " ") { e.preventDefault(); sonarCaso(); }
+  else if (e.key === "l" || e.key === "L") $("bLento")?.click();
+  else if (e.key === "b" || e.key === "B") $("bBucle")?.click();
+  else if (e.key === "0") elegir("", false);
+  else if (/^[1-9]$/.test(e.key) && ajustes.valores[+e.key - 1]) elegir(ajustes.valores[+e.key - 1]);
+});
+
+// ---------- exportar y fusionar ----------
+function filasFinales() {
+  return filas.map((f) => { const o = { ...f }; for (const c of EDITABLES) o[c] = valor(f, c); return o; });
+}
+$("btnExportar").onclick = () => {
+  const blob = new Blob([escribirCSV(filasFinales(), cabecera)], { type: "text/csv;charset=utf-8" });
+  const fecha = new Date().toISOString().slice(0, 16).replace(/[T:]/g, "-");
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: `casos-${(ajustes.revisor || "estudio").replace(/\s+/g, "-")}-${fecha}.csv` });
+  document.body.append(a); a.click(); a.remove();
+  aviso("CSV exportado.");
+};
+
+$("btnImportar").onclick = () => $("importar").click();
+$("importar").onchange = async (e) => {
+  let tomados = 0; const conflictos = [];
+  const porId = new Map(filas.map((f) => [f.ID, f]));
+  for (const file of e.target.files) {
+    const { filas: otras } = leerCSV(await file.text());
+    for (const o of otras) {
+      const f = porId.get(o.ID); if (!f) continue;
+      for (const c of EDITABLES) {
+        const suyo = (o[c] ?? "").trim(), mio = valor(f, c).trim();
+        if (!suyo || suyo === mio) continue;
+        if (!mio || (c === "-d-" && /transcrita/.test(mio))) { editar(f, c, suyo); tomados++; }
+        else conflictos.push({ f, c, suyo });
+      }
+    }
+  }
+  if (conflictos.length && confirm(`${tomados} casillas nuevas incorporadas.\n\nHay ${conflictos.length} casillas en las que el CSV importado dice otra cosa que tú.\n¿Quieres quedarte con los valores importados? (Cancelar = conservar los tuyos)`)) {
+    for (const { f, c, suyo } of conflictos) editar(f, c, suyo);
+    tomados += conflictos.length;
+  }
+  e.target.value = "";
+  aviso(`${tomados} casillas incorporadas.`);
+  filtrar();
+};
+
+function abrirAjustes() {
+  $("ajRevisor").value = ajustes.revisor;
+  $("ajValores").value = ajustes.valores.join(", ");
+  $("dlgAjustes").showModal();
+}
+$("btnAjustes").onclick = abrirAjustes;
+$("dlgAjustes").onclose = () => {
+  if ($("dlgAjustes").returnValue !== "ok") return;
+  const valores = $("ajValores").value.split(",").map((s) => s.trim()).filter(Boolean);
+  ajustes = { revisor: $("ajRevisor").value.trim(), valores: valores.length ? valores.slice(0, 9) : VALORES };
+  localStorage.setItem("estudio-d:ajustes", JSON.stringify(ajustes));
+  if (actual >= 0) mostrar(actual, false);
+};
+
+// Arranque: si el estudio lleva los datos dentro (va en el ZIP), se abre directamente.
+const incrustados = JSON.parse($("datos").textContent);
+if (incrustados) empezar(incrustados, (ruta) => ruta);
+</script>
+</body>
+</html>

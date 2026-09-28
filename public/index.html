@@ -1,0 +1,342 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>-d- intervocálica en PRESEEA · Sociolingüística</title>
+<meta name="description" content="Busca los casos de -d- intervocálica en entrevistas del corpus PRESEEA, los sitúa en el audio con Whisper, corta un recorte por caso, los categoriza con Jev y abre un estudio para decidirlos uno a uno.">
+<style>
+  :root { --papel:#f5efe3; --papel2:#efe6d6; --tinta:#2b2622; --gris:#6f655c; --terracota:#b5553c; --linea:#d9cfbf; }
+  * { box-sizing: border-box; }
+  body { margin:0; background:var(--papel); color:var(--tinta); font:17px/1.55 Georgia, "Times New Roman", serif; }
+  main { max-width: 900px; margin: 0 auto; padding: 56px 24px 80px; }
+  h1 { font-weight: normal; font-size: 2.1rem; margin: 0 0 .3rem; letter-spacing: -.01em; }
+  h1 span, h2 span { color: var(--terracota); }
+  h2 { font-weight: normal; font-size: 1.45rem; margin: 3rem 0 .6rem; }
+  .entradilla { color: var(--gris); margin: 0 0 1.4rem; }
+  nav { display: flex; gap: .4rem; border-bottom: 1px solid var(--linea); margin: 1.8rem 0 1.6rem; }
+  nav button { background: none; color: var(--gris); border: 0; border-bottom: 2px solid transparent; border-radius: 0; padding: .5rem .8rem; }
+  nav button.activa { color: var(--tinta); border-bottom-color: var(--terracota); }
+  ol.pasos { padding-left: 1.2rem; color: var(--gris); margin: 0 0 1.4rem; }
+  ol.pasos li { margin: .25rem 0; }
+  a { color: var(--terracota); }
+  .zona { border: 1.5px dashed var(--linea); border-radius: 6px; padding: 32px 20px; text-align: center; cursor: pointer; transition: border-color .15s, background .15s; }
+  .zona.encima, .zona:hover { border-color: var(--terracota); background: var(--papel2); }
+  .zona strong { color: var(--terracota); font-weight: normal; text-decoration: underline; }
+  details { margin: 1rem 0 0; color: var(--gris); }
+  textarea { width: 100%; min-height: 90px; font: 14px/1.4 ui-monospace, Menlo, monospace; background: #fbf8f1; border: 1px solid var(--linea); border-radius: 4px; padding: 8px; color: var(--tinta); }
+  button { font: inherit; background: var(--terracota); color: #fff; border: 0; border-radius: 4px; padding: .55rem 1.2rem; cursor: pointer; }
+  button.sec { background: transparent; color: var(--terracota); border: 1px solid var(--terracota); }
+  button:disabled { opacity: .45; cursor: default; }
+  .panel { display: none; }
+  .panel.activo { display: block; }
+  #resultado { display: none; margin-top: 2rem; }
+  .resumen { font-size: 1.1rem; margin-bottom: 1rem; }
+  fieldset { border: 1px solid var(--linea); border-radius: 6px; padding: .8rem 1rem 1rem; margin: 0 0 1.2rem; }
+  legend { color: var(--gris); padding: 0 .3rem; font-size: .95rem; }
+  .opciones label { display: block; cursor: pointer; margin: .2rem 0; }
+  .opciones small { color: var(--gris); }
+  .acciones { display: flex; gap: .8rem; align-items: center; flex-wrap: wrap; }
+  progress { width: 100%; height: 8px; margin-top: 1rem; accent-color: var(--terracota); display: none; }
+  .estado { color: var(--gris); font-size: .95rem; margin-top: .4rem; min-height: 1.4em; white-space: pre-line; }
+  .errores { color: var(--terracota); font-size: .95rem; white-space: pre-line; }
+  table { width: 100%; border-collapse: collapse; margin-top: 1.6rem; font-size: .92rem; }
+  th, td { text-align: left; padding: .35rem .5rem; border-bottom: 1px solid var(--linea); }
+  th { font-weight: normal; color: var(--gris); }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  code { font: .88em ui-monospace, Menlo, monospace; }
+  .cajas { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 1rem; margin: 1rem 0; }
+  .caja { border: 1px solid var(--linea); border-radius: 6px; padding: 1rem; background: #f8f3e9; }
+  .caja h3 { font-weight: normal; margin: 0 0 .4rem; font-size: 1.1rem; }
+  .caja p { margin: 0; color: var(--gris); font-size: .95rem; }
+  footer { margin-top: 3.5rem; color: var(--gris); font-size: .85rem; border-top: 1px solid var(--linea); padding-top: 1rem; }
+</style>
+</head>
+<body>
+<main>
+  <h1>La <span>-d-</span> intervocálica en PRESEEA</h1>
+  <p class="entradilla">Para el trabajo de Sociolingüística y Etnolingüística. La web busca todos los casos de -d- entre vocales en las entrevistas que elijas (también los que la transcripción ya escribe sin d, como <em>tomao</em> o <em>na</em>), los sitúa en el audio, corta un recorte por caso y te da un estudio para escucharlos y decidir cómo se pronuncia cada uno.</p>
+
+  <div class="cajas">
+    <div class="caja"><h3>1. Procesar</h3><p>Desde el CSV del buscador de PRESEEA, para una o varias ciudades.</p></div>
+    <div class="caja"><h3>2. Categorizar</h3><p>Con Jev: categoría gramatical, lema en contexto y elisiones dudosas.</p></div>
+    <div class="caja"><h3>3. Estudiar</h3><p>Escuchar cada caso y rellenar la columna -d- en grupo.</p></div>
+  </div>
+
+  <nav>
+    <button class="activa" data-panel="pProcesar">Procesar entrevistas</button>
+    <button data-panel="pCategorizar">Categorizar un ZIP con Jev</button>
+    <button data-panel="pEstudio">Estudio</button>
+  </nav>
+
+  <!-- Procesar -->
+  <section class="panel activo" id="pProcesar">
+    <ol class="pasos">
+      <li>Haz una consulta en el <a href="https://preseea.uah.es/corpus/consultas.php" target="_blank" rel="noopener">buscador de PRESEEA</a>. Para tener todas las entrevistas de una ciudad basta con buscar una palabra muy frecuente (<em>de</em>) filtrando por esa ciudad; puedes marcar varias ciudades.</li>
+      <li>En los resultados, pulsa «Descargar: CSV» y arrastra aquí el archivo.</li>
+      <li>Elige las opciones y pulsa «Procesar». Tarda cerca de un minuto por entrevista la primera vez que alguien la procesa; después sale al momento.</li>
+    </ol>
+    <div class="zona" id="zonaCsv" tabindex="0" role="button">Arrastra aquí el CSV o <strong>elige un archivo</strong></div>
+    <input id="archivoCsv" type="file" accept=".csv,.tsv,.txt,text/csv" hidden>
+    <details>
+      <summary>¿No tienes el CSV? Pega las claves a mano</summary>
+      <p>Una o varias claves separadas por espacios, comas o saltos de línea (por ejemplo, <code>BARC_H11_075</code>).</p>
+      <textarea id="pegadas" placeholder="BARC_H11_075&#10;PALM_M33_037"></textarea>
+      <p><button class="sec" id="usarPegadas">Usar estas claves</button></p>
+    </details>
+
+    <section id="resultado">
+      <p class="resumen" id="resumen"></p>
+      <fieldset class="opciones">
+        <legend>Qué buscar</legend>
+        <label><input type="checkbox" id="oInterior" checked disabled> -d- entre vocales dentro de palabra (<em>cansado</em>, <em>todo</em>), elisiones ya transcritas (<em>tomao</em>, <em>na</em>) y ultracorrecciones (<em>bacalado</em>)</label>
+        <label><input type="checkbox" id="oFrontera"> También la d inicial entre vocales de dos palabras (<em>la dama</em>, <em>me dijo</em>) <small>· multiplica los casos</small></label>
+        <label><input type="checkbox" id="oLenguas" checked> Incluir los pasajes marcados en otra lengua (catalán, gallego…) <small>· se señalan en la columna «Lengua»</small></label>
+        <label><input type="checkbox" id="oExtranjero" checked> Incluir las palabras marcadas como extranjeras</label>
+      </fieldset>
+      <fieldset class="opciones">
+        <legend>Qué hacer después</legend>
+        <label><input type="checkbox" id="oJev" checked> Categorizar con Jev (categoría gramatical, lema según el contexto y elisiones dudosas)</label>
+        <label>Margen del recorte a cada lado de la palabra: <select id="oMargen"><option>1</option><option selected>1.5</option><option>2</option><option>3</option></select> s</label>
+      </fieldset>
+      <div class="acciones">
+        <button id="procesar">Procesar y descargar el ZIP</button>
+        <button class="sec" id="cancelar" hidden>Cancelar</button>
+      </div>
+      <progress id="barra" max="1" value="0"></progress>
+      <div class="estado" id="estado"></div>
+      <div class="errores" id="errores"></div>
+      <table>
+        <thead><tr><th>Clave</th><th>Ciudad</th><th>Sexo</th><th>Edad</th><th>Nivel</th><th class="num">Casos</th><th>Alineación</th></tr></thead>
+        <tbody id="tabla"></tbody>
+      </table>
+    </section>
+  </section>
+
+  <!-- Categorizar -->
+  <section class="panel" id="pCategorizar">
+    <p>Si procesaste sin Jev, o quieres repetir la categorización, sube aquí el ZIP que te dio esta web. Se devuelve el mismo ZIP con las columnas «Categoría», «Lema» y «Confianza Jev» rellenas, y con las elisiones dudosas revisadas (las que Jev considera otra palabra pasan a <code>descartados.csv</code>). Lo que ya hubierais rellenado en <code>casos.csv</code> se conserva.</p>
+    <div class="zona" id="zonaZip" tabindex="0" role="button">Arrastra aquí el ZIP o <strong>elige el archivo</strong></div>
+    <input id="archivoZip" type="file" accept=".zip,application/zip" hidden>
+    <p><label><input type="checkbox" id="cTodo"> Volver a categorizar también los casos que ya pasaron por Jev</label></p>
+    <progress id="barraZip" max="1" value="0"></progress>
+    <div class="estado" id="estadoZip"></div>
+  </section>
+
+  <!-- Estudio -->
+  <section class="panel" id="pEstudio">
+    <p>El estudio va dentro de cada ZIP (<code>estudio.html</code>): descomprímelo y ábrelo con el navegador, sin conexión. También puedes abrirlo aquí y cargar el ZIP:</p>
+    <p><a href="estudio.html"><button>Abrir el estudio</button></a></p>
+    <p>Cada persona del grupo marca sus casos (lo marcado se guarda en su navegador) y exporta su CSV. Con «Fusionar CSV» se juntan los de todos, o se incorpora el que descarguéis de la hoja de cálculo compartida. Para sincronizar automáticamente con una hoja de Google, usad la herramienta de terminal del <a href="https://github.com/joseluissaorin/sociolinguistica" target="_blank" rel="noopener">repositorio</a>.</p>
+  </section>
+
+  <h2>Cómo funciona</h2>
+  <p>Cada transcripción se limpia de etiquetas (también las que parten palabras, como <code>chancla&lt;alargamiento/&gt;s</code>) y se quedan solo los turnos del informante. El audio se transcribe con Whisper con tiempos por palabra, y esa transcripción se alinea con la de PRESEEA para saber en qué segundo suena cada palabra. Whisper solo aporta el tiempo: la forma, el lema y la decisión salen de la transcripción del corpus y de vuestro oído, porque Whisper «corrige» lo que oye y escribe <em>tomado</em> donde se dijo <em>tomao</em>.</p>
+  <p>Solo entran los casos que caen dentro del audio: los MP3 abiertos del corpus duran unos diez minutos, aunque la transcripción esté completa. El lema sale de un léxico de formas del español y del catalán; para los participios, Jev decide si funcionan como verbo (<em>ha cansado</em> → <em>cansar</em>) o como adjetivo (<em>estoy cansado</em> → <em>cansado</em>).</p>
+
+  <footer>
+    Los audios y las transcripciones proceden del <a href="https://preseea.uah.es/" target="_blank" rel="noopener">Proyecto para el estudio sociolingüístico del español de España y de América (PRESEEA)</a> (licencia <a href="https://creativecommons.org/licenses/by-nc-nd/4.0/deed.es" target="_blank" rel="noopener">CC BY-NC-ND 4.0</a>). Transcripción automática con Whisper en Cloudflare; categorización con Jev (TypeSafe); lemas de las listas de <a href="https://github.com/michmech/lemmatization-lists" target="_blank" rel="noopener">Michal Měchura</a> (ODbL). Tu CSV y tus decisiones no salen de tu navegador. Código abierto en <a href="https://github.com/joseluissaorin/sociolinguistica" target="_blank" rel="noopener">GitHub</a>.
+  </footer>
+</main>
+
+<script type="module">
+import { downloadZip } from "./vendor/client-zip.js";
+import { decodificar } from "./motor/transcripcion.js";
+import { Lexico } from "./motor/lexico.js";
+import { procesarEntrevista } from "./motor/proceso.js";
+import { empaquetar, reempaquetar } from "./motor/salida.js";
+import { categorizar } from "./motor/jev.js";
+import { leerCSV } from "./motor/csv.js";
+
+const $ = (id) => document.getElementById(id);
+const CLAVE_OK = /^[A-Za-z0-9_\-]{3,40}$/;
+const norm = (s) => s.normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+let entrevistas = [], abortador = null;
+
+// ---------- pestañas ----------
+for (const b of document.querySelectorAll("nav button")) b.onclick = () => {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("activa", x === b));
+  document.querySelectorAll(".panel").forEach((p) => p.classList.toggle("activo", p.id === b.dataset.panel));
+};
+
+function zona(idZona, idInput, alSoltar) {
+  const z = $(idZona);
+  z.onclick = () => $(idInput).click();
+  z.onkeydown = (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); $(idInput).click(); } };
+  z.ondragover = (e) => { e.preventDefault(); z.classList.add("encima"); };
+  z.ondragleave = () => z.classList.remove("encima");
+  z.ondrop = (e) => { e.preventDefault(); z.classList.remove("encima"); if (e.dataTransfer.files[0]) alSoltar(e.dataTransfer.files[0]); };
+  $(idInput).onchange = (e) => e.target.files[0] && alSoltar(e.target.files[0]);
+}
+
+// ---------- CSV del buscador ----------
+function desdeCSV(texto) {
+  const { cabecera, filas } = leerCSV(texto);
+  const col = (n) => cabecera.find((c) => norm(c) === n);
+  const cClave = col("clave");
+  if (!cClave) throw new Error("No encuentro la columna «Clave». ¿Es el CSV que descarga el buscador de PRESEEA?");
+  const mapa = new Map();
+  for (const f of filas) {
+    const clave = (f[cClave] || "").trim();
+    if (!CLAVE_OK.test(clave) || mapa.has(clave)) continue;
+    mapa.set(clave, { clave, ciudad: f[col("ciudad")] || "", sexo: f[col("sexo")] || "", edad: f[col("edad")] || "", nivel: f[col("nivel")] || "" });
+  }
+  return [...mapa.values()].sort((a, b) => a.clave.localeCompare(b.clave));
+}
+const desdeTexto = (t) => [...new Set(t.split(/[\s,;]+/).filter((s) => CLAVE_OK.test(s)))].sort().map((clave) => ({ clave, ciudad: "", sexo: "", edad: "", nivel: "" }));
+
+zona("zonaCsv", "archivoCsv", async (file) => {
+  try { mostrar(desdeCSV(decodificar(new Uint8Array(await file.arrayBuffer())))); } catch (e) { alert(e.message); }
+});
+$("usarPegadas").onclick = () => mostrar(desdeTexto($("pegadas").value));
+
+const ROMANO = { 1: "I", 2: "II", 3: "III" }, NIVEL = { 1: "Bajo", 2: "Medio", 3: "Alto" }, SEXO = { H: "Hombre", M: "Mujer" };
+function mostrar(lista) {
+  if (!lista.length) { alert("No he encontrado ninguna clave de entrevista válida."); return; }
+  entrevistas = lista;
+  const ciudades = [...new Set(lista.map((e) => e.ciudad).filter(Boolean))];
+  $("resumen").textContent = `${lista.length} ${lista.length === 1 ? "entrevista" : "entrevistas"}` + (ciudades.length ? ` de ${ciudades.length > 3 ? ciudades.length + " ciudades" : ciudades.join(", ")}` : "") + ".";
+  $("tabla").innerHTML = "";
+  for (const e of lista) {
+    const tr = document.createElement("tr");
+    tr.id = "fila-" + e.clave;
+    for (const c of [e.clave, e.ciudad, SEXO[e.sexo] || e.sexo, ROMANO[e.edad] || e.edad, NIVEL[e.nivel] || e.nivel, "", ""]) { const td = document.createElement("td"); td.textContent = c; tr.append(td); }
+    tr.children[5].className = "num";
+    $("tabla").append(tr);
+  }
+  $("errores").textContent = ""; $("estado").textContent = "";
+  $("resultado").style.display = "block";
+  $("resultado").scrollIntoView({ behavior: "smooth", block: "start" });
+}
+
+// ---------- proceso ----------
+let lexicos = null;
+async function cargarLexicos() {
+  if (lexicos) return lexicos;
+  const leer = async (l) => { const r = await fetch(`lexico/${l}.txt`); if (!r.ok) throw new Error("No se pudo cargar el léxico"); return r.text(); };
+  const [es, ca] = await Promise.all([leer("es"), leer("ca")]);
+  return (lexicos = { es: new Lexico(es), ca: new Lexico(ca) });
+}
+
+async function pedir(url, init, senal) {
+  for (let k = 0; ; k++) {
+    const r = await fetch(url, { ...init, signal: senal });
+    if (r.ok) return r;
+    let msg = `HTTP ${r.status}`;
+    try { msg = (await r.json()).error || msg; } catch {}
+    if (r.status === 429 && k < 8) { $("estado").textContent += `\n${msg}`; await new Promise((ok) => setTimeout(ok, 20000)); continue; }
+    if (r.status >= 500 && k < 2) { await new Promise((ok) => setTimeout(ok, 4000)); continue; }
+    throw new Error(msg);
+  }
+}
+
+const nombreZip = (lista, ciudades) => {
+  const s = ciudades.length === 1 ? ciudades[0] : ciudades.length ? "varias-ciudades" : "entrevistas";
+  return `d-intervocalica-${s.normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/\s+/g, "-")}-${lista.length}.zip`;
+};
+
+async function guardarZip(archivos, nombre) {
+  const entradas = [...archivos].map(([name, input]) => ({ name, input }));
+  const zip = downloadZip(entradas);
+  if (window.showSaveFilePicker) {
+    try {
+      const h = await showSaveFilePicker({ suggestedName: nombre, types: [{ description: "ZIP", accept: { "application/zip": [".zip"] } }] });
+      await zip.body.pipeTo(await h.createWritable());
+      return;
+    } catch (e) { if (e.name === "AbortError") return; }
+  }
+  const blob = await new Response(zip.body).blob();
+  const a = Object.assign(document.createElement("a"), { href: URL.createObjectURL(blob), download: nombre });
+  document.body.append(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 60_000);
+}
+
+$("procesar").onclick = async () => {
+  const opciones = { frontera: $("oFrontera").checked, otrasLenguas: $("oLenguas").checked, extranjero: $("oExtranjero").checked };
+  const jev = $("oJev").checked, margen = parseFloat($("oMargen").value);
+  abortador = new AbortController();
+  const senal = abortador.signal;
+  $("procesar").disabled = true; $("cancelar").hidden = false;
+  $("barra").style.display = "block"; $("barra").max = entrevistas.length + (jev ? 1 : 0); $("barra").value = 0;
+  $("errores").textContent = "";
+  const errores = [], hechas = [];
+  try {
+    $("estado").textContent = "Cargando el léxico…";
+    const lex = await cargarLexicos();
+    const plantilla = await (await fetch("estudio.html")).text();
+    for (const [i, e] of entrevistas.entries()) {
+      $("estado").textContent = `${e.clave} (${i + 1} de ${entrevistas.length}): descargando…`;
+      try {
+        const [txt, mp3] = await Promise.all([
+          pedir(`f/txt/${e.clave}.txt`, {}, senal).then((r) => r.arrayBuffer()),
+          pedir(`f/audio/${e.clave}.mp3`, {}, senal).then((r) => r.arrayBuffer()),
+        ]);
+        $("estado").textContent = `${e.clave} (${i + 1} de ${entrevistas.length}): transcribiendo con Whisper…`;
+        const whisper = await (await pedir("api/whisper", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ clave: e.clave }) }, senal)).json();
+        const r = procesarEntrevista({ texto: decodificar(new Uint8Array(txt)), nombre: `${e.clave}.txt`, mp3: new Uint8Array(mp3), whisper, lexicos: lex, opciones, margen });
+        r.whisper = whisper;
+        hechas.push(r);
+        const fila = $("fila-" + e.clave);
+        if (fila) {
+          if (!fila.children[1].textContent) fila.children[1].textContent = r.meta.ciudad;
+          fila.children[5].textContent = r.casos.length;
+          fila.children[6].textContent = (r.alineacion.cobertura * 100).toFixed(0) + " %";
+        }
+      } catch (err) {
+        if (senal.aborted) throw err;
+        errores.push(`${e.clave}: ${err.message}`);
+      }
+      $("barra").value = i + 1;
+    }
+    const todos = hechas.flatMap((h) => h.casos);
+    if (jev && todos.length) {
+      await categorizar(todos, async (lote) => (await (await pedir("api/jev", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ casos: lote }) }, senal)).json()).respuestas, {
+        simultaneos: 3,
+        progreso: (h, n, err) => { $("estado").textContent = `Jev: ${h} de ${n} casos${err ? ` (${err} sin respuesta)` : ""}…`; $("barra").value = entrevistas.length + h / n; },
+      });
+    }
+    if (!hechas.length) throw new Error("No se pudo procesar ninguna entrevista.");
+    const ciudades = [...new Set(hechas.map((h) => h.meta.ciudad).filter(Boolean))];
+    const info = { generado: new Date().toLocaleString("es-ES"), herramienta: "sociolinguistica.joseluissaorin.com", opciones, margen, jev };
+    $("estado").textContent = "Montando el ZIP…";
+    await guardarZip(empaquetar(hechas, { plantillaEstudio: plantilla, info }), nombreZip(hechas, ciudades));
+    const validos = todos.filter((c) => !c.descartado).length;
+    $("estado").textContent = `Listo: ${validos} casos en ${hechas.length} ${hechas.length === 1 ? "entrevista" : "entrevistas"}${todos.length - validos ? ` (${todos.length - validos} posibles elisiones descartadas por Jev, en descartados.csv)` : ""}.\nDescomprime el ZIP y abre estudio.html para empezar a escuchar.`;
+  } catch (e) {
+    $("estado").textContent = senal.aborted ? "Cancelado." : `Error: ${e.message}`;
+  } finally {
+    if (errores.length) $("errores").textContent = "No se pudieron procesar:\n" + errores.join("\n");
+    $("procesar").disabled = false; $("cancelar").hidden = true; abortador = null;
+  }
+};
+$("cancelar").onclick = () => abortador && abortador.abort();
+
+// ---------- categorizar un ZIP ----------
+zona("zonaZip", "archivoZip", async (file) => {
+  const est = $("estadoZip"), barra = $("barraZip");
+  try {
+    est.textContent = "Abriendo el ZIP…";
+    const { unzipSync } = await import("./vendor/fflate.js");
+    const todo = unzipSync(new Uint8Array(await file.arrayBuffer()));
+    const rutaJson = Object.keys(todo).find((n) => /(^|\/)casos\.json$/.test(n));
+    if (!rutaJson) throw new Error("El ZIP no trae casos.json: ¿es un ZIP generado por esta web?");
+    const raiz = rutaJson.replace(/casos\.json$/, "");
+    const json = JSON.parse(new TextDecoder().decode(todo[rutaJson]));
+    if ($("cTodo").checked) for (const c of json.casos) c.jev = false;
+    barra.style.display = "block";
+    const r = await categorizar(json.casos, async (lote) => (await (await pedir("api/jev", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ casos: lote }) })).json()).respuestas, {
+      simultaneos: 3,
+      progreso: (h, n) => { est.textContent = `Jev: ${h} de ${n} casos…`; barra.max = n; barra.value = h; },
+    });
+    const csvAnterior = todo[raiz + "casos.csv"] ? new TextDecoder().decode(todo[raiz + "casos.csv"]) : "";
+    const nuevos = reempaquetar(json, { plantillaEstudio: await (await fetch("estudio.html")).text(), csvAnterior });
+    const archivos = new Map();
+    for (const [n, b] of Object.entries(todo)) if (n.startsWith(raiz) && !n.endsWith("/")) archivos.set(n.slice(raiz.length), b);
+    for (const [n, b] of nuevos) archivos.set(n, b);
+    await guardarZip(archivos, file.name.replace(/(\.zip)?$/i, "-jev.zip"));
+    est.textContent = r.enviados ? `Listo: ${r.enviados} casos categorizados${r.errores ? `, ${r.errores} sin respuesta (vuelve a subir el ZIP para reintentarlos)` : ""}.` : "Todos los casos ya estaban categorizados. Marca la casilla para repetirlo.";
+  } catch (e) { est.textContent = "Error: " + e.message; }
+});
+</script>
+</body>
+</html>
