@@ -61,6 +61,8 @@ La columna **-d-** solo trae un valor cuando la transcripción ya lo muestra (`e
 
 El audio se transcribe con Whisper (`whisper-large-v3-turbo` en Workers AI) con tiempos por palabra, y esa transcripción se alinea con la de PRESEEA mediante programación dinámica. Las palabras emparejadas reciben su tiempo; las demás, uno interpolado entre sus vecinas. En las entrevistas de prueba se emparejan entre el 93 % y el 98 % de las palabras, y las marcas `<tiempo>` de PRESEEA coinciden con el resultado.
 
+Cuando el tiempo de una palabra es interpolado, el recorte abarca todo el hueco entre las dos palabras emparejadas más cercanas (hasta 15 s), de modo que la palabra queda dentro aunque la estimación se desvíe; esos casos llevan el aviso «recorte ampliado». En una muestra al azar vuelta a transcribir, todos los recortes con tiempo exacto contenían su palabra.
+
 Whisper solo aporta el tiempo. La forma y la decisión salen de la transcripción del corpus y del oído del grupo, porque Whisper normaliza lo que oye: escribe *tomado* donde se dijo *tomao*. Para el alineamiento, *tomao* y *tomado* se tratan como la misma palabra.
 
 ## Lemas y Jev
@@ -85,7 +87,7 @@ node cli/socio.mjs procesar "PRESEEA Barcelona" "PRESEEA Palma" --salida analisi
 node cli/socio.mjs categorizar analisis --todo      # repetir la categorización con Jev
 ```
 
-Cada carpeta de entrada tiene `Audios/` y `Transcripciones/`. Opciones de `procesar`: `--frontera`, `--sin-otras-lenguas`, `--sin-extranjero`, `--sin-jev`, `--margen 2`, `--solo BARC_H21_085,BARC_M13_001`. Si vuelves a procesar encima de una carpeta, se conserva lo que ya estuviera rellenado.
+Cada carpeta de entrada tiene `Audios/` y `Transcripciones/`. Opciones de `procesar`: `--frontera`, `--sin-otras-lenguas`, `--sin-extranjero`, `--sin-jev`, `--margen 2`, `--solo BARC_H21_085,BARC_M13_001`. Si vuelves a procesar encima de una carpeta, se conserva lo que ya estuviera rellenado. Los ID se asignan en orden dentro de cada entrevista, así que cambiar las opciones de búsqueda cambia los ID: decidid las opciones antes de empezar a rellenar.
 
 ### Hoja de Google compartida
 
