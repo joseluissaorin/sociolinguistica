@@ -192,45 +192,18 @@ async function hoja() {
   const cuenta = CUENTA();
   if (!op.carpeta) throw new Error("Falta --carpeta <id de la carpeta de Drive>");
   const { filas } = leerCSV(readFileSync(join(dir, "casos.csv"), "utf8"));
-  // 1. Subcarpeta con los recortes, reflejando la estructura local.
-  const buscar = (nombre, padre) => {
-    const r = JSON.parse(gog(["drive", "ls", "--parent", padre, "--json", "--max", "1000"], cuenta));
-    return (r.files || r).find((f) => f.name === nombre && /folder/.test(f.mimeType));
-  };
-  const crear = (nombre, padre) => JSON.parse(gog(["drive", "mkdir", nombre, "--parent", padre, "--json"], cuenta));
-  const idCarpeta = (ruta) => {
-    let padre = op.carpeta;
-    for (const parte of ruta.split("/")) {
-      const f = buscar(parte, padre) || crear(parte, padre);
-      padre = f.id || f.file?.id;
-    }
-    return padre;
-  };
-  const enlaces = new Map();
-  const porCarpeta = new Map();
-  for (const f of filas) if (f.Recorte && !f.Enlace) {
-    const d = dirname(f.Recorte);
-    if (!porCarpeta.has(d)) porCarpeta.set(d, new Set());
-    porCarpeta.get(d).add(f.Recorte);
-  }
-  let subidos = 0;
-  for (const [d, rutas] of porCarpeta) {
-    const padre = idCarpeta(d);
-    const existentes = new Map(((r) => (r.files || r))(JSON.parse(gog(["drive", "ls", "--parent", padre, "--json", "--max", "1000"], cuenta))).map((x) => [x.name, x.id]));
-    for (const ruta of rutas) {
-      let id = existentes.get(basename(ruta));
-      if (!id) {
-        const r = JSON.parse(gog(["drive", "upload", join(dir, ruta), "--parent", padre, "--json"], cuenta));
-        id = r.id || r.file?.id;
-        subidos++;
-        if (subidos % 50 === 0) log(`  ${subidos} recortes subidos…`);
-      }
-      enlaces.set(ruta, `https://drive.google.com/file/d/${id}/view`);
-    }
-  }
-  for (const f of filas) if (enlaces.has(f.Recorte)) f.Enlace = enlaces.get(f.Recorte);
+  // 1. Los recortes se suben de una vez con «gog drive sync push», que devuelve el ID de cada
+  //    archivo (también de los que ya estaban): con eso se rellena «Enlace».
+  const ls = (padre) => JSON.parse(gog(["drive", "ls", "--parent", padre, "--json", "--max", "1000"], cuenta)).files || [];
+  let recortes = ls(op.carpeta).find((f) => f.name === "Recortes" && /folder/.test(f.mimeType))?.id;
+  if (!recortes) recortes = JSON.parse(gog(["drive", "mkdir", "Recortes", "--parent", op.carpeta, "--json"], cuenta)).folder.id;
+  log("Subiendo los recortes a Drive…");
+  const r = JSON.parse(gog(["drive", "sync", "push", "--parent", recortes, join(dir, "Recortes"), "--json"], cuenta));
+  const ids = new Map(r.actions.filter((a) => a.file_id && !/folder/.test(a.mime_type || "")).map((a) => [`Recortes/${a.path}`, a.file_id]));
+  let n = 0;
+  for (const f of filas) if (ids.has(f.Recorte)) { f.Enlace = `https://drive.google.com/file/d/${ids.get(f.Recorte)}/view`; n++; }
   writeFileSync(join(dir, "casos.csv"), escribirCSV(filas));
-  log(`${subidos} recortes subidos; enlaces rellenos.`);
+  log(`${r.summary.create_files} recortes nuevos en Drive (${r.summary.skip_files} ya estaban); ${n} enlaces rellenos.`);
 
   // 2. La hoja de cálculo: se crea una vez a partir del CSV y se recuerda su ID.
   const est = existsSync(estado(dir)) ? JSON.parse(readFileSync(estado(dir), "utf8")) : {};
@@ -244,6 +217,10 @@ async function hoja() {
     const meta = JSON.parse(gog(["sheets", "metadata", est.hoja, "--json"], cuenta));
     const pest = (meta.sheets || meta.spreadsheet?.sheets || [])[0]?.properties;
     if (pest && pest.title !== "casos") gog(["sheets", "rename-tab", est.hoja, pest.title, "casos"], cuenta);
+    // Cabecera fija y desplegable en la columna -d- (sin bloquear otros valores).
+    gog(["sheets", "freeze", est.hoja, "--rows", "1", "--sheet", "casos"], cuenta);
+    const valores = (op.valores || "mantenida,relajada,elidida,no se oye,elidida (transcrita),ultracorrección (transcrita)").split(",");
+    gog(["sheets", "validation", "set", est.hoja, `casos!F2:F${filas.length + 1}`, "--type", "ONE_OF_LIST", ...valores.flatMap((v) => ["--value", v.trim()]), "--no-strict", "--show-custom-ui"], cuenta);
     log(`Hoja creada: https://docs.google.com/spreadsheets/d/${est.hoja}`);
   } else {
     escribirHoja(est.hoja, fusionar(est.base || [], filas, leerHoja(est.hoja, cuenta)).filas, cuenta);
